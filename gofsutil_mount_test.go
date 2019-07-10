@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/akutz/gofsutil"
+	"github.com/dell/gofsutil"
 )
 
 func TestBindMount(t *testing.T) {

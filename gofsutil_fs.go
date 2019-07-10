@@ -100,3 +100,23 @@ func (fs *FS) ValidateDevice(
 
 	return fs.validateDevice(ctx, source)
 }
+
+// WWNToDevicePath returns the device path given a LUN's WWN.
+func (fs *FS) WWNToDevicePath(ctx context.Context, wwn string) (string, error) {
+	return fs.wwnToDevicePath(ctx, wwn)
+}
+
+// RescanSCSIHost will rescan scsi hosts for a specified lun.
+// If targets are specified, only hosts who are related to the specified
+// iqn target(s) are rescanned.
+// If lun is specified, then the rescan is for that particular volume.
+func (fs *FS) RescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	return fs.rescanSCSIHost(ctx, targets, lun)
+}
+
+// RemoveBlockDevice removes a block device by getting the device name
+// from the last component of the blockDevicePath and then removing the
+// device by writing '1' to /sys/block{deviceName}/device/delete
+func (fs *FS) RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
+	return fs.removeBlockDevice(ctx, blockDevicePath)
+}
