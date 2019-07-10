@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -22,6 +23,7 @@ const (
 
 var (
 	bindRemountOpts = []string{"remount"}
+	mountLock       sync.Mutex
 )
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
@@ -83,14 +85,22 @@ func (fs *FS) formatAndMount(
 	if mountErr == nil {
 		return nil
 	}
+	log.WithField("mountErr", mountErr.Error()).Info("Mount attempt failed")
 
 	// Mount failed. This indicates either that the disk is unformatted or
 	// it contains an unexpected filesystem.
 	existingFormat, err := fs.getDiskFormat(ctx, source)
 	if err != nil {
+		log.WithFields(f).Info("error determining disk format")
 		return err
 	}
+	f = log.Fields{
+		"source":         source,
+		"existingFormat": existingFormat,
+	}
+	log.WithFields(f).Info("getDiskFormat returned after initial mount failed")
 	if existingFormat == "" {
+		log.WithFields(f).Info("disk is unformatted")
 		// Disk is unformatted so format it.
 		args := []string{source}
 		// Use 'ext4' as the default
@@ -119,6 +129,7 @@ func (fs *FS) formatAndMount(
 
 	// Disk is already formatted and failed to mount
 	if len(fsType) == 0 || fsType == existingFormat {
+		log.WithField("ExistingFormat", existingFormat).Info("Disk failed to mount")
 		// This is mount error
 		return mountErr
 	}
@@ -183,6 +194,8 @@ func (fs *FS) bindMount(
 
 // getMounts returns a slice of all the mounted filesystems
 func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
+	mountLock.Lock()
+	defer mountLock.Unlock()
 
 	if simpleGetMounts {
 		var err error

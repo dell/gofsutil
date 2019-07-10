@@ -5,8 +5,10 @@ package gofsutil
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -145,4 +147,173 @@ func (fs *FS) validateDevice(
 	}
 
 	return source, nil
+}
+
+// wwnToDevicePath looks up a volume WWN in /dev/disk/by-id
+// and returns the corresponding device entry in /dev.
+func (fs *FS) wwnToDevicePath(
+	ctx context.Context, wwn string) (string, error) {
+	path := fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+	devPath, err := os.Readlink(path)
+	if err != nil {
+		log.Printf("Check for disk path %s not found", path)
+		return "", err
+	}
+	components := strings.Split(devPath, "/")
+	lastPart := components[len(components)-1]
+	devPath = "/dev/" + lastPart
+	log.Printf("Check for disk path %s found: %s", path, devPath)
+	return devPath, err
+}
+
+// rescanSCSIHost will rescan scsi hosts for a specified lun.
+// If targets are specified, only hosts who are related to the specified
+// iqn target(s) are rescanned.
+// If lun is specified, then the rescan is for that particular volume.
+func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	// If no lun is specifed, the "-" character is a wildcard that will update all LUNs.
+	if lun == "" {
+		lun = "-"
+	} else {
+		// The lun string is speficied as a hex string by Powermax.
+		// We need decimal for the scan, so do the conversion.
+		val, err := strconv.ParseInt(lun, 16, 32)
+		if err == nil {
+			lun = strconv.Itoa(int(val))
+		} else {
+			lun = "-"
+		}
+	}
+
+	type targetdev struct {
+		host    string
+		channel string
+		target  string
+	}
+	var targetDevices []*targetdev
+
+	// Read the sessions.
+	sessionsdir := "/sys/class/iscsi_session"
+	sessions, err := ioutil.ReadDir(sessionsdir)
+	if err != nil {
+		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
+		return err
+	}
+	// Look through the iscsi sessions
+	for _, session := range sessions {
+		if !strings.HasPrefix(session.Name(), "session") {
+			continue
+		}
+		log.Debug("Processing session: " + session.Name())
+		if len(targets) > 0 {
+			targetBytes, err := ioutil.ReadFile(sessionsdir + "/" + session.Name() + "/" + "targetname")
+			if err != nil {
+				continue
+			}
+			target := strings.Trim(string(targetBytes), "\n\r\t ")
+			var hasTarget bool
+			for _, tg := range targets {
+				if tg == target {
+					hasTarget = true
+				}
+			}
+			if !hasTarget {
+				continue
+			}
+		}
+		// Read device/target entry to get the data for rescan.
+		devicedir := sessionsdir + "/" + session.Name() + "/" + "device"
+		devices, err := ioutil.ReadDir(devicedir)
+		if err != nil {
+			log.WithField("error", err).Error("Cannot read directory: " + devicedir)
+			continue
+		}
+		// Loop through the devices for the target* one
+		for _, device := range devices {
+			if strings.HasPrefix(device.Name(), "target") {
+				name := device.Name()[6:]
+				split := strings.Split(name, ":")
+				if len(split) >= 3 {
+					entry := new(targetdev)
+					entry.host = "host" + split[0]
+					entry.channel = split[1]
+					entry.target = split[2]
+					targetDevices = append(targetDevices, entry)
+					log.Debug(fmt.Sprintf("Adding targetdev: %#v", entry))
+				}
+				break
+			}
+		}
+	}
+
+	hostsdir := "/sys/class/scsi_host"
+	if len(targetDevices) > 0 {
+		for _, entry := range targetDevices {
+			scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, entry.host)
+			scanstring := fmt.Sprintf("%s %s %s", entry.channel, entry.target, lun)
+			log.Printf("rescanning %s with: "+scanstring, scanfile)
+			f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
+			if err != nil {
+				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
+				continue
+			}
+			if _, err := f.WriteString(scanstring); err != nil {
+				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
+			}
+			f.Close()
+		}
+		return nil
+	}
+
+	// Fallback... we didn't find any target devices... so rescan all the hosts
+	// Gather up the host devices.
+	hosts, err := ioutil.ReadDir(hostsdir)
+	if err != nil {
+		log.WithField("error", err).Error("Cannot read directory: " + hostsdir)
+		return err
+	}
+	// For each of the matching hosts, perform a rescan.
+	for _, host := range hosts {
+		if !strings.HasPrefix(host.Name(), "host") {
+			continue
+		}
+		scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, host.Name())
+		scanstring := fmt.Sprintf("- - %s", lun)
+		log.Printf("rescanning %s with: "+scanstring, scanfile)
+		f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
+		if err != nil {
+			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
+			continue
+		}
+		if _, err := f.WriteString(scanstring); err != nil {
+			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
+		}
+		f.Close()
+	}
+	return nil
+}
+
+// removeBlockDevice removes a block device by getting the device name
+// from the last component of the blockDevicePath and then removing the
+// device by writing '1' to /sys/block{deviceName}/device/delete
+func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) error {
+	// Here we want to remove /sys/block/{deviceName} by writing a 1 to
+	// /sys/block{deviceName}/device/delete
+	devicePathComponents := strings.Split(blockDevicePath, "/")
+	if len(devicePathComponents) > 1 {
+		deviceName := devicePathComponents[len(devicePathComponents)-1]
+		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
+		f, err := os.OpenFile(blockDeletePath, os.O_APPEND|os.O_WRONLY, 0200)
+		if err != nil {
+			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")
+			return err
+		} else {
+			log.WithField("BlockDeletePath", blockDeletePath).Info("Writing '1' to block device delete path")
+			if _, err := f.WriteString("1"); err != nil {
+				log.WithField("BlockDeletePath", blockDeletePath).Error("Could not write to block device delete path")
+			}
+			f.Close()
+		}
+	}
+	return nil
 }

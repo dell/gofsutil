@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 )
 
+// FSinterface has the methods support by gofsutils.
 type FSinterface interface {
 
 	// Architecture specific implementations
@@ -19,6 +20,9 @@ type FSinterface interface {
 	unmount(ctx context.Context, target string) error
 	getDevMounts(ctx context.Context, dev string) ([]Info, error)
 	validateDevice(ctx context.Context, source string) (string, error)
+	wwnToDevicePath(ctx context.Context, wwn string) (string, error)
+	rescanSCSIHost(ctx context.Context, targets []string, lun string) error
+	removeBlockDevice(ctx context.Context, blockDevicePath string) error
 
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
@@ -30,6 +34,9 @@ type FSinterface interface {
 	GetMounts(ctx context.Context) ([]Info, error)
 	GetDevMounts(ctx context.Context, dev string) ([]Info, error)
 	ValidateDevice(ctx context.Context, source string) (string, error)
+	WWNToDevicePath(ctx context.Context, wwn string) (string, error)
+	RescanSCSIHost(ctx context.Context, targets []string, lun string) error
+	RemoveBlockDevice(ctx context.Context, blockDevicePath string) error
 }
 
 var (
@@ -41,6 +48,9 @@ var (
 	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
 )
 
+// UseMockFS creates a mock file system for testing. This then is used
+// with gofsutil_mock.go methods so that you can implement mock testing
+// for calls using gofsutils.
 func UseMockFS() {
 	fs = &mockfs{ScanEntry: defaultEntryScanFunc}
 }
@@ -140,4 +150,25 @@ func EvalSymlinks(ctx context.Context, symPath *string) error {
 // Otherwise an empty string is returned.
 func ValidateDevice(ctx context.Context, source string) (string, error) {
 	return fs.ValidateDevice(ctx, source)
+}
+
+// WWNToDevicePath returns the device path corresponding to a LUN's WWN
+// (World Wide Name). A null path is returned if the deivce isn't found.
+func WWNToDevicePath(ctx context.Context, wwn string) (string, error) {
+	return fs.WWNToDevicePath(ctx, wwn)
+}
+
+// RescanSCSIHost will rescan scsi hosts for a specified lun.
+// If targets are specified, only hosts who are related to the specified
+// iqn target(s) are rescanned.
+// If lun is specified, then the rescan is for that particular volume.
+func RescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	return fs.RescanSCSIHost(ctx, targets, lun)
+}
+
+// RemoveBlockDevice removes a block device by getting the device name
+// from the last component of the blockDevicePath and then removing the
+// device by writing '1' to /sys/block{deviceName}/device/delete
+func RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
+	return fs.RemoveBlockDevice(ctx, blockDevicePath)
 }

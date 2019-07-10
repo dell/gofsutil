@@ -4,19 +4,32 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 var (
+	// GOFSMockMounts and the other variables in gofsutils_mock.go
+	// allow the user to manipulate the data returned in the mock
+	// mode or return induced errors.
 	GOFSMockMounts []Info
-	GOFSMock       struct {
-		InduceBindMountError bool
-		InduceMountError     bool
-		InduceGetMountsError bool
-		InduceDevMountsError bool
-		InduceUnmountError   bool
-		InduceFormatError    bool
-		InduceGetDiskFormatError bool
-		InduceGetDiskFormatType string
+	// GOFSMockWWNToDevice allows you to return a device for a WWN.
+	GOFSMockWWNToDevice map[string]string
+	// GOFSRescanCallback is a function called when a rescan is processed.
+	GOFSRescanCallback func(scan string)
+	// GOFSMock allows you to induce errors in the various routine.
+	GOFSMock struct {
+		InduceBindMountError         bool
+		InduceMountError             bool
+		InduceGetMountsError         bool
+		InduceDevMountsError         bool
+		InduceUnmountError           bool
+		InduceFormatError            bool
+		InduceGetDiskFormatError     bool
+		InduceWWNToDevicePathError   bool
+		InduceRemoveBlockDeviceError bool
+		InduceGetDiskFormatType      string
 	}
 )
 
@@ -28,7 +41,7 @@ type mockfs struct {
 func (fs *mockfs) getDiskFormat(ctx context.Context, disk string) (string, error) {
 	if GOFSMock.InduceGetDiskFormatError {
 		GOFSMock.InduceMountError = false
-		return "",  errors.New("getDiskFormat induced error")
+		return "", errors.New("getDiskFormat induced error")
 	}
 	if GOFSMock.InduceGetDiskFormatType != "" {
 		GOFSMock.InduceMountError = false
@@ -48,7 +61,7 @@ func (fs *mockfs) formatAndMount(ctx context.Context, source, target, fsType str
 		return errors.New("bindMount induced error")
 	}
 	fmt.Printf(">>>formatAndMount source %s target %s fstype %s opts %v\n", source, target, fsType, opts)
-	info := Info{Device: source, Path: target, Type: fsType, Opts: make([]string, 0)}
+	info := Info{Device: getDevice(source), Path: target, Type: fsType, Opts: make([]string, 0)}
 	for _, str := range opts {
 		info.Opts = append(info.Opts, str)
 	}
@@ -74,7 +87,7 @@ func (fs *mockfs) bindMount(ctx context.Context, source, target string, opts ...
 		return errors.New("bindMount induced error")
 	}
 	fmt.Printf(">>>bindMount source %s target %s opts %v\n", source, target, opts)
-	info := Info{Device: source, Path: target, Opts: make([]string, 0)}
+	info := Info{Device: getDevice(source), Path: target, Opts: make([]string, 0)}
 	for _, str := range opts {
 		info.Opts = append(info.Opts, str)
 	}
@@ -100,7 +113,7 @@ func (fs *mockfs) mount(ctx context.Context, source, target, fsType string, opts
 		return errors.New("mount induced error")
 	}
 	fmt.Printf(">>>mount source %s target %s fstype %s opts %v\n", source, target, fsType, opts)
-	info := Info{Device: source, Path: target, Opts: make([]string, 0)}
+	info := Info{Device: getDevice(source), Path: target, Opts: make([]string, 0)}
 	for _, str := range opts {
 		info.Opts = append(info.Opts, str)
 	}
@@ -235,4 +248,85 @@ func (fs *mockfs) ValidateDevice(
 	ctx context.Context, source string) (string, error) {
 
 	return fs.validateDevice(ctx, source)
+}
+
+// wwnToDevicePath lookups a mock WWN (no prefix) to a device path.
+func (fs *mockfs) wwnToDevicePath(
+	ctx context.Context, wwn string) (string, error) {
+	if GOFSMockWWNToDevice == nil {
+		GOFSMockWWNToDevice = make(map[string]string)
+	}
+	devPath := GOFSMockWWNToDevice[wwn]
+	if GOFSMock.InduceWWNToDevicePathError {
+		return "", errors.New("induced error")
+	}
+	return devPath, nil
+}
+
+func (fs *mockfs) WWNToDevicePath(
+	ctx context.Context, wwn string) (string, error) {
+	return fs.wwnToDevicePath(ctx, wwn)
+}
+
+// RescanSCSIHost will rescan scsi hosts for a specified lun.
+// If targets are specified, only hosts who are related to the specified
+// iqn target(s) are rescanned.
+// If lun is specified, then the rescan is for that particular volume.
+func (fs *mockfs) RescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	return fs.rescanSCSIHost(ctx, targets, lun)
+}
+
+// rescanSCSIHost will rescan scsi hosts for a specified lun.
+// If targets are specified, only hosts who are related to the specified
+// iqn target(s) are rescanned.
+// If lun is specified, then the rescan is for that particular volume.
+func (fs *mockfs) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	if GOFSRescanCallback != nil {
+		scanString := fmt.Sprintf("%s", lun)
+		GOFSRescanCallback(scanString)
+	}
+	return nil
+}
+
+// RemoveBlockDevice removes a block device by getting the device name
+// from the last component of the blockDevicePath and then removing the
+// device by writing '1' to /sys/block{deviceName}/device/delete
+func (fs *mockfs) RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
+	if GOFSMock.InduceRemoveBlockDeviceError {
+		return errors.New("remove block device induced error")
+	}
+	return fs.removeBlockDevice(ctx, blockDevicePath)
+}
+
+// removeBlockDevice removes a block device by getting the device name
+// from the last component of the blockDevicePath and then removing the
+// device by writing '1' to /sys/block{deviceName}/device/delete
+func (fs *mockfs) removeBlockDevice(ctx context.Context, blockDevicePath string) error {
+	for key, value := range GOFSMockWWNToDevice {
+		if value == blockDevicePath {
+			// Remove from the device table
+			GOFSMockWWNToDevice[key] = ""
+		}
+		_ = os.Remove(blockDevicePath)
+	}
+	return nil
+}
+
+// getDevice returns the actual device pointed to by a
+// symlink if applicable, otherwise the original string.
+func getDevice(path string) string {
+	_, err := os.Lstat(path)
+	if err != nil {
+		return path
+	}
+
+	// eval any symlinks and make sure it points to a device
+	d, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return path
+	}
+
+	result := strings.Replace(d, "\\", "/", -1)
+	fmt.Printf("getDevice: %s -> %s\n", path, result)
+	return result
 }

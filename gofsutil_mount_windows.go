@@ -51,3 +51,23 @@ func (fs *FS) validateDevice(
 	ctx context.Context, source string) (string, error) {
 	return "", errors.New("not implemented")
 }
+
+func (fs *FS) wwnToDevicePath(
+	ctx context.Context, wwn string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
+// rescanSCSIHost will rescan scsi hosts for a specified lun.
+// If targets are specified, only hosts who are related to the specified
+// iqn target(s) are rescanned.
+// If lun is specified, then the rescan is for that particular volume.
+func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	return errors.New("not implemented")
+}
+
+// RemoveBlockDevice removes a block device by getting the device name
+// from the last component of the blockDevicePath and then removing the
+// device by writing '1' to /sys/block{deviceName}/device/delete
+func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) error {
+	return errors.New("not implemented")
+}

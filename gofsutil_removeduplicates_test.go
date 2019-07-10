@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/akutz/gofsutil"
+	"github.com/dell/gofsutil"
 )
 
 func TestRemoveDuplicatesExponentialOrdered_SmallData(t *testing.T) {
