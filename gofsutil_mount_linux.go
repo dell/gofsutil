@@ -1,12 +1,13 @@
 package gofsutil
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -15,15 +16,11 @@ const (
 	procMountsPath = "/proc/self/mountinfo"
 	// procMountsRetries is number of times to retry for a consistent
 	// read of procMountsPath.
-	procMountsRetries = 10
-	// simpleGetMounts if true just returns the first valid set of proc mount entries.
-	// if false then we must get two consequtive proc mounts with the same hash.
-	simpleGetMounts = true
+	procMountsRetries = 30
 )
 
 var (
 	bindRemountOpts = []string{"remount"}
-	mountLock       sync.Mutex
 )
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
@@ -65,14 +62,20 @@ func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 	return "unknown data, probably partitions", nil
 }
 
+// Log the CSI or other type of Request ID
+const RequestID = "RequestID"
+
 // formatAndMount uses unix utils to format and mount the given disk
 func (fs *FS) formatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string) error {
+	reqID := ctx.Value(ContextKey(RequestID))
+	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
 	opts = append(opts, "defaults")
 	f := log.Fields{
+		"reqID":   reqID,
 		"source":  source,
 		"target":  target,
 		"fsType":  fsType,
@@ -95,6 +98,7 @@ func (fs *FS) formatAndMount(
 		return err
 	}
 	f = log.Fields{
+		"reqID":          reqID,
 		"source":         source,
 		"existingFormat": existingFormat,
 	}
@@ -110,7 +114,17 @@ func (fs *FS) formatAndMount(
 
 		if fsType == "ext4" || fsType == "ext3" {
 			args = []string{"-F", source}
+			if noDiscard == NoDiscard {
+				// -E nodiscard option to improve mkfs times
+				args = []string{"-F", "-E", "nodiscard", source}
+			}
 		}
+
+		if fsType == "xfs" && noDiscard == NoDiscard {
+			// -K option (nodiscard) to improve mkfs times
+			args = []string{"-K", source}
+		}
+
 		f["fsType"] = fsType
 		log.WithFields(f).Info(
 			"disk appears unformatted, attempting format")
@@ -145,9 +159,12 @@ func (fs *FS) format(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string) error {
+	reqID := ctx.Value(ContextKey("RequestID"))
+	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
 	opts = append(opts, "defaults")
 	f := log.Fields{
+		"reqID":   reqID,
 		"source":  source,
 		"target":  target,
 		"fsType":  fsType,
@@ -163,7 +180,17 @@ func (fs *FS) format(
 
 	if fsType == "ext4" || fsType == "ext3" {
 		args = []string{"-F", source}
+		if noDiscard == NoDiscard {
+			// -E nodiscard option to improve mkfs times
+			args = []string{"-F", "-E", "nodiscard", source}
+		}
 	}
+
+	if fsType == "xfs" && noDiscard == NoDiscard {
+		// -K option (nodiscard) to improve mkfs times
+		args = []string{"-K", source}
+	}
+
 	f["fsType"] = fsType
 	log.WithFields(f).Info(
 		"disk appears unformatted, attempting format")
@@ -192,41 +219,35 @@ func (fs *FS) bindMount(
 	return fs.doMount(ctx, "mount", source, target, "", opts...)
 }
 
-// getMounts returns a slice of all the mounted filesystems
-func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
-	mountLock.Lock()
-	defer mountLock.Unlock()
-
-	if simpleGetMounts {
-		var err error
-		for i := 0; i < procMountsRetries; i++ {
-			mps, _, err := fs.readProcMounts(ctx, procMountsPath, false)
-			if err == nil {
-				return mps, err
-			}
-		}
-		return nil, fmt.Errorf("getMounts failed after %d retries: %s", procMountsRetries, err.Error())
-	}
-
-	_, hash1, err := fs.readProcMounts(ctx, procMountsPath, false)
+func (fs *FS) consistentRead(filename string, retry int) ([]byte, error) {
+	oldContent, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
-
-	for i := 0; i < procMountsRetries; i++ {
-		mps, hash2, err := fs.readProcMounts(ctx, procMountsPath, true)
+	for i := 0; i < retry; i++ {
+		newContent, err := ioutil.ReadFile(filename)
 		if err != nil {
 			return nil, err
 		}
-		if hash1 == hash2 {
-			// Success
-			return mps, nil
+		if bytes.Compare(oldContent, newContent) == 0 {
+			return newContent, nil
 		}
-		hash1 = hash2
+		// Files are different, continue reading
+		oldContent = newContent
 	}
-	return nil, fmt.Errorf(
-		"failed to get a consistent snapshot of %v after %d tries",
-		procMountsPath, procMountsRetries)
+	return nil, fmt.Errorf("could not get consistent content of %s after %d attempts", filename, retry)
+}
+
+// getMounts returns a slice of all the mounted filesystems
+func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
+	infos := make([]Info, 0)
+	content, err := fs.consistentRead(procMountsPath, procMountsRetries)
+	if err != nil {
+		return infos, err
+	}
+	buffer := bytes.NewBuffer(content)
+	infos, _, err = ReadProcMountsFrom(ctx, buffer, true, ProcMountsFields, fs.ScanEntry)
+	return infos, err
 }
 
 // readProcMounts reads procMountsInfo and produce a hash

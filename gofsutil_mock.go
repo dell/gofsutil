@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
@@ -14,22 +15,35 @@ var (
 	// allow the user to manipulate the data returned in the mock
 	// mode or return induced errors.
 	GOFSMockMounts []Info
+	// GOFSMockFCHostWWNs is a list of port WWNs on this host's FC NICs
+	GOFSMockFCHostWWNs []string
 	// GOFSMockWWNToDevice allows you to return a device for a WWN.
 	GOFSMockWWNToDevice map[string]string
+	// GOFSWWNPath gives a path for the WWN entry (e.g. /dev/disk/by-id/wwn-0x)
+	GOFSWWNPath string
+	// GOFSTargetIPLUNToDevice map[string]string
+	// assumes key is of form ip-<targetIP>:-lun<decimal_lun_id>
+	GOFSMockTargetIPLUNToDevice map[string]string
 	// GOFSRescanCallback is a function called when a rescan is processed.
 	GOFSRescanCallback func(scan string)
 	// GOFSMock allows you to induce errors in the various routine.
 	GOFSMock struct {
-		InduceBindMountError         bool
-		InduceMountError             bool
-		InduceGetMountsError         bool
-		InduceDevMountsError         bool
-		InduceUnmountError           bool
-		InduceFormatError            bool
-		InduceGetDiskFormatError     bool
-		InduceWWNToDevicePathError   bool
-		InduceRemoveBlockDeviceError bool
-		InduceGetDiskFormatType      string
+		InduceBindMountError           bool
+		InduceMountError               bool
+		InduceGetMountsError           bool
+		InduceDevMountsError           bool
+		InduceUnmountError             bool
+		InduceFormatError              bool
+		InduceGetDiskFormatError       bool
+		InduceWWNToDevicePathError     bool
+		InduceTargetIPLUNToDeviceError bool
+		InduceRemoveBlockDeviceError   bool
+		InduceMultipathCommandError    bool
+		InduceFCHostWWNsError          bool
+		InduceRescanError              bool
+		InduceIssueLipError            bool
+		InduceGetSysBlockDevicesError  bool
+		InduceGetDiskFormatType        string
 	}
 )
 
@@ -252,19 +266,19 @@ func (fs *mockfs) ValidateDevice(
 
 // wwnToDevicePath lookups a mock WWN (no prefix) to a device path.
 func (fs *mockfs) wwnToDevicePath(
-	ctx context.Context, wwn string) (string, error) {
+	ctx context.Context, wwn string) (string, string, error) {
 	if GOFSMockWWNToDevice == nil {
 		GOFSMockWWNToDevice = make(map[string]string)
 	}
 	devPath := GOFSMockWWNToDevice[wwn]
 	if GOFSMock.InduceWWNToDevicePathError {
-		return "", errors.New("induced error")
+		return "", "", errors.New("induced error")
 	}
-	return devPath, nil
+	return GOFSWWNPath + wwn, devPath, nil
 }
 
 func (fs *mockfs) WWNToDevicePath(
-	ctx context.Context, wwn string) (string, error) {
+	ctx context.Context, wwn string) (string, string, error) {
 	return fs.wwnToDevicePath(ctx, wwn)
 }
 
@@ -276,11 +290,21 @@ func (fs *mockfs) RescanSCSIHost(ctx context.Context, targets []string, lun stri
 	return fs.rescanSCSIHost(ctx, targets, lun)
 }
 
+// Execute the multipath command with a timeout and various arguments.
+// Optionally a chroot directory can be specified for changing root directory.
+// This only works in a container or another environment where it can chroot to /noderoot.
+func (fs *mockfs) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	return fs.multipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+}
+
 // rescanSCSIHost will rescan scsi hosts for a specified lun.
 // If targets are specified, only hosts who are related to the specified
 // iqn target(s) are rescanned.
 // If lun is specified, then the rescan is for that particular volume.
 func (fs *mockfs) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	if GOFSMock.InduceRescanError {
+		return errors.New("induced rescan error")
+	}
 	if GOFSRescanCallback != nil {
 		scanString := fmt.Sprintf("%s", lun)
 		GOFSRescanCallback(scanString)
@@ -302,10 +326,11 @@ func (fs *mockfs) RemoveBlockDevice(ctx context.Context, blockDevicePath string)
 // from the last component of the blockDevicePath and then removing the
 // device by writing '1' to /sys/block{deviceName}/device/delete
 func (fs *mockfs) removeBlockDevice(ctx context.Context, blockDevicePath string) error {
+	fmt.Printf(">>>removeBlockDevice %s %#v", blockDevicePath, GOFSMockWWNToDevice)
 	for key, value := range GOFSMockWWNToDevice {
 		if value == blockDevicePath {
 			// Remove from the device table
-			GOFSMockWWNToDevice[key] = ""
+			delete(GOFSMockWWNToDevice, key)
 		}
 		_ = os.Remove(blockDevicePath)
 	}
@@ -327,6 +352,85 @@ func getDevice(path string) string {
 	}
 
 	result := strings.Replace(d, "\\", "/", -1)
-	fmt.Printf("getDevice: %s -> %s\n", path, result)
+	fmt.Printf(">>>getDevice: %s -> %s\n", path, result)
 	return result
+}
+
+// Execute the multipath command with a timeout and various arguments.
+// Optionally a chroot directory can be specified for changing root directory.
+// This only works in a container or another environment where it can chroot to /noderoot.
+func (fs *mockfs) multipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	if GOFSMock.InduceMultipathCommandError {
+		return make([]byte, 0), errors.New("multipath command induced error")
+	}
+	GOFSMockWWNToDevice = make(map[string]string)
+	return make([]byte, 0), nil
+}
+
+// TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
+// and a LUN id. It returns the entry names in /dev/disk/by-path and the corresponding device path, along with error.
+func (fs *mockfs) TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+	return fs.targetIPLUNToDevicePath(ctx, targetIP, lunID)
+}
+
+// TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
+// and a LUN id. It returns the entry names in /dev/disk/by-path and their associated device paths, along with error.
+func (fs *mockfs) targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+	result := make(map[string]string, 0)
+	key := fmt.Sprintf("ip-%s:-lun-%d", targetIP, lunID)
+	if GOFSMockTargetIPLUNToDevice == nil {
+		GOFSMockTargetIPLUNToDevice = make(map[string]string)
+	}
+	if GOFSMock.InduceTargetIPLUNToDeviceError {
+		return result, errors.New("induced error")
+	}
+	path := GOFSMockTargetIPLUNToDevice[key]
+	result[key] = path
+	return result, nil
+}
+
+func (fs *mockfs) GetFCHostPortWWNs(ctx context.Context) ([]string, error) {
+	return fs.getFCHostPortWWNs(ctx)
+}
+
+// getFCHostPortWWNs returns the port WWN addresses of local FC adapters.
+func (fs *mockfs) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
+	portWWNs := GOFSMockFCHostWWNs
+	if GOFSMock.InduceFCHostWWNsError {
+		return portWWNs, errors.New("induced error")
+	}
+	return portWWNs, nil
+}
+
+// IssueLIPToAllFCHosts issues the LIP command to all FC hosts.
+func (fs *mockfs) IssueLIPToAllFCHosts(ctx context.Context) error {
+	return fs.issueLIPToAllFCHosts(ctx)
+}
+
+// issueLIPToAllFCHosts issues the LIP command to all FC hosts.
+func (fs *mockfs) issueLIPToAllFCHosts(ctx context.Context) error {
+	if GOFSMock.InduceIssueLipError {
+		return errors.New("induced error")
+	}
+	return nil
+}
+
+// GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
+func (fs *mockfs) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+	return fs.getSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
+}
+
+// GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
+func (fs *mockfs) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+	result := make([]string, 0)
+	if GOFSMock.InduceGetSysBlockDevicesError {
+		return result, errors.New("induced error")
+	}
+	for key, value := range GOFSMockWWNToDevice {
+		if key == volumeWWN {
+			split := strings.Split(value, "/")
+			result = append(result, split[len(split)-1])
+		}
+	}
+	return result, nil
 }

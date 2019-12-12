@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"time"
 )
 
 // FSinterface has the methods support by gofsutils.
 type FSinterface interface {
-
 	// Architecture specific implementations
 	getDiskFormat(ctx context.Context, disk string) (string, error)
 	format(ctx context.Context, source, target, fsType string, opts ...string) error
@@ -20,9 +20,14 @@ type FSinterface interface {
 	unmount(ctx context.Context, target string) error
 	getDevMounts(ctx context.Context, dev string) ([]Info, error)
 	validateDevice(ctx context.Context, source string) (string, error)
-	wwnToDevicePath(ctx context.Context, wwn string) (string, error)
+	wwnToDevicePath(ctx context.Context, wwn string) (string, string, error)
 	rescanSCSIHost(ctx context.Context, targets []string, lun string) error
 	removeBlockDevice(ctx context.Context, blockDevicePath string) error
+	targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error)
+	multipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error)
+	getFCHostPortWWNs(ctx context.Context) ([]string, error)
+	issueLIPToAllFCHosts(ctx context.Context) error
+	getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
 
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
@@ -34,10 +39,19 @@ type FSinterface interface {
 	GetMounts(ctx context.Context) ([]Info, error)
 	GetDevMounts(ctx context.Context, dev string) ([]Info, error)
 	ValidateDevice(ctx context.Context, source string) (string, error)
-	WWNToDevicePath(ctx context.Context, wwn string) (string, error)
+	WWNToDevicePath(ctx context.Context, wwn string) (string, string, error)
 	RescanSCSIHost(ctx context.Context, targets []string, lun string) error
 	RemoveBlockDevice(ctx context.Context, blockDevicePath string) error
+	TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error)
+	MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error)
+	GetFCHostPortWWNs(ctx context.Context) ([]string, error)
+	IssueLIPToAllFCHosts(ctx context.Context) error
+	GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
 }
+
+var (
+	MultipathDevDiskByIDPrefix = "/dev/disk/by-id/dm-uuid-mpath-3"
+)
 
 var (
 	// ErrNotImplemented is returned when a platform does not implement
@@ -47,6 +61,12 @@ var (
 	// fs is the default FS instance.
 	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
 )
+
+// Type of variable containing context-keys
+type ContextKey string
+
+// Context option for using the nodiscard flag on mkfs
+const NoDiscard = "NoDiscard"
 
 // UseMockFS creates a mock file system for testing. This then is used
 // with gofsutil_mock.go methods so that you can implement mock testing
@@ -153,14 +173,22 @@ func ValidateDevice(ctx context.Context, source string) (string, error) {
 }
 
 // WWNToDevicePath returns the device path corresponding to a LUN's WWN
-// (World Wide Name). A null path is returned if the deivce isn't found.
+// (World Wide Name). A null path is returned if the device isn't found.
 func WWNToDevicePath(ctx context.Context, wwn string) (string, error) {
+	_, path, err := fs.WWNToDevicePath(ctx, wwn)
+	return path, err
+}
+
+// WWNToDevicePathX returns the symlink and device path corresponding to a LUN's WWN
+// (World Wide Name). A null path is returned if the device isn't found.
+func WWNToDevicePathX(ctx context.Context, wwn string) (string, string, error) {
 	return fs.WWNToDevicePath(ctx, wwn)
 }
 
 // RescanSCSIHost will rescan scsi hosts for a specified lun.
 // If targets are specified, only hosts who are related to the specified
-// iqn target(s) are rescanned.
+// FC port WWN or iscsi iqn target(s) are rescanned.
+// Targets must either begin with 0x50 for FC or iqn. for Iscsi.
 // If lun is specified, then the rescan is for that particular volume.
 func RescanSCSIHost(ctx context.Context, targets []string, lun string) error {
 	return fs.RescanSCSIHost(ctx, targets, lun)
@@ -171,4 +199,32 @@ func RescanSCSIHost(ctx context.Context, targets []string, lun string) error {
 // device by writing '1' to /sys/block{deviceName}/device/delete
 func RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
 	return fs.RemoveBlockDevice(ctx, blockDevicePath)
+}
+
+// Execute the multipath command with a timeout and various arguments.
+// Optionally a chroot directory can be specified for changing root directory.
+// This only works in a container or another environment where it can chroot to /noderoot.
+func MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	return fs.MultipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+}
+
+// TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
+// and a LUN id. It returns the entry name in /dev/disk/by-path and the device path, along with error.
+func TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+	return fs.TargetIPLUNToDevicePath(ctx, targetIP, lunID)
+}
+
+// GetFCHostPortWWNs returns the Fibrechannel Port WWNs of the local host.
+func GetFCHostPortWWNs(ctx context.Context) ([]string, error) {
+	return fs.GetFCHostPortWWNs(ctx)
+}
+
+// IssueLIPToAllFCHosts issues the LIP command to all FC hosts.
+func IssueLIPToAllFCHosts(ctx context.Context) error {
+	return fs.IssueLIPToAllFCHosts(ctx)
+}
+
+// GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
+func GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+	return fs.GetSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
 }

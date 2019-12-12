@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -150,20 +151,78 @@ func (fs *FS) validateDevice(
 }
 
 // wwnToDevicePath looks up a volume WWN in /dev/disk/by-id
-// and returns the corresponding device entry in /dev.
+// and returns a) the symlink path in /dev/disk/by-id and
+// b) the corresponding device entry in /dev.
 func (fs *FS) wwnToDevicePath(
-	ctx context.Context, wwn string) (string, error) {
-	path := fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
-	devPath, err := os.Readlink(path)
-	if err != nil {
-		log.Printf("Check for disk path %s not found", path)
-		return "", err
+	ctx context.Context, wwn string) (string, string, error) {
+
+	// Look for multipath device.
+	symlinkPath := fmt.Sprintf("%s%s", MultipathDevDiskByIDPrefix, wwn)
+	devPath, err := os.Readlink(symlinkPath)
+
+	// Look for regular path device.
+	if err != nil || devPath == "" {
+		symlinkPath = fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+		devPath, err = os.Readlink(symlinkPath)
+		if err != nil {
+			log.Printf("Check for disk path %s not found", symlinkPath)
+			return "", "", err
+		}
 	}
 	components := strings.Split(devPath, "/")
 	lastPart := components[len(components)-1]
 	devPath = "/dev/" + lastPart
-	log.Printf("Check for disk path %s found: %s", path, devPath)
-	return devPath, err
+	log.Printf("Check for disk path %s found: %s", symlinkPath, devPath)
+	return symlinkPath, devPath, err
+}
+
+// targetIPLUNToDevicePath returns all the /dev/disk/by-path entries for a give targetIP and lunID
+func (fs *FS) targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+	result := make(map[string]string, 0)
+	bypathdir := "/dev/disk/by-path"
+	entries, err := ioutil.ReadDir(bypathdir)
+	if err != nil {
+		log.Printf("/dev/disk/by-path not found: %s", err.Error())
+		return result, err
+	}
+	// Loop through the entries
+	for _, entry := range entries {
+		name := entry.Name()
+		// Looking for entries of these forms:
+		// ip-10.247.73.127:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0 -> ../../sdc
+		// ip-10.247.73.127:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0x0101000000000000 -> ../../sdro
+		if !strings.HasPrefix(name, "ip-"+targetIP+":") {
+			continue
+		}
+		if !(strings.HasSuffix(name, fmt.Sprintf("-lun-%d", lunID)) ||
+			strings.HasSuffix(name, fmt.Sprintf("-lun-0x%04x000000000000", lunID))) {
+			continue
+		}
+		// Look up the symbolic link
+		path := bypathdir + "/" + name
+		devPath, err := os.Readlink(path)
+		if err != nil {
+			log.Printf("Check for disk path %s not found", path)
+			return result, err
+		}
+		components := strings.Split(devPath, "/")
+		lastPart := components[len(components)-1]
+		devPath = "/dev/" + lastPart
+		log.Printf("Check for disk path %s found: %s", path, devPath)
+		result[path] = devPath
+	}
+	return result, nil
+}
+
+// targetdev for a rescan operation
+type targetdev struct {
+	host    string
+	channel string
+	target  string
+}
+
+func (td *targetdev) String() string {
+	return fmt.Sprintf("%s:%s:%s", td.host, td.channel, td.target)
 }
 
 // rescanSCSIHost will rescan scsi hosts for a specified lun.
@@ -171,6 +230,7 @@ func (fs *FS) wwnToDevicePath(
 // iqn target(s) are rescanned.
 // If lun is specified, then the rescan is for that particular volume.
 func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+	var err error
 	// If no lun is specifed, the "-" character is a wildcard that will update all LUNs.
 	if lun == "" {
 		lun = "-"
@@ -185,26 +245,147 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 		}
 	}
 
-	type targetdev struct {
-		host    string
-		channel string
-		target  string
+	iscsiTargets, fcTargets := splitTargets(targets)
+	targetDevices, err := getFCTargetHosts(fcTargets)
+	if err != nil {
+		return err
 	}
-	var targetDevices []*targetdev
+	log.Printf("iscsiTargets: %s; fcTargets: %s", iscsiTargets, targetDevices)
 
+	iscsiTargetDevices, err := getIscsiTargetHosts(iscsiTargets)
+	if err != nil {
+		return err
+	}
+	targetDevices = append(targetDevices, iscsiTargetDevices...)
+
+	hostsdir := "/sys/class/scsi_host"
+	if len(targetDevices) > 0 {
+		for _, entry := range targetDevices {
+			scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, entry.host)
+			scanstring := fmt.Sprintf("%s %s %s", entry.channel, entry.target, lun)
+			log.Printf("rescanning %s with: "+scanstring, scanfile)
+			f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
+			if err != nil {
+				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
+				continue
+			}
+			if _, err := f.WriteString(scanstring); err != nil {
+				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
+			}
+			f.Close()
+		}
+		return nil
+	}
+
+	// Fallback... we didn't find any target devices... so rescan all the hosts
+	// Gather up the host devices.
+	log.Printf("No targeted devices found... rescanning all the hosts")
+	hosts, err := ioutil.ReadDir(hostsdir)
+	if err != nil {
+		log.WithField("error", err).Error("Cannot read directory: " + hostsdir)
+		return err
+	}
+	// For each of the matching hosts, perform a rescan.
+	for _, host := range hosts {
+		if !strings.HasPrefix(host.Name(), "host") {
+			continue
+		}
+		scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, host.Name())
+		scanstring := fmt.Sprintf("- - %s", lun)
+		log.Printf("rescanning %s with: "+scanstring, scanfile)
+		f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
+		if err != nil {
+			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
+			continue
+		}
+		if _, err := f.WriteString(scanstring); err != nil {
+			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
+		}
+		f.Close()
+	}
+	return nil
+}
+
+const FCPortPrefix = "0x50"
+
+// getFCTargetHosts adds the list of the fibre channel hosts in /sys/class/scsi_host to be rescanned,
+// The targets are a list of array port WWNs in the port group used. They must start with 0x50 and
+// be of the form 0x50000973b000b804 as an example.
+// along with the channel and target, to the targetdev list.
+func getFCTargetHosts(targets []string) ([]*targetdev, error) {
+	targetDev := make([]*targetdev, 0)
+	duplicates := make(map[string]bool)
+	if len(targets) == 0 {
+		return targetDev, nil
+	}
+	// Read the directory entries for fc_remote_ports
+	fcRemotePortsDir := "/sys/class/fc_remote_ports"
+	remotePortEntries, err := ioutil.ReadDir(fcRemotePortsDir)
+	if err != nil {
+		log.WithField("error", err).Error("Cannot read directory: " + fcRemotePortsDir)
+	}
+
+	// Look through
+	for _, remotePort := range remotePortEntries {
+		if !strings.HasPrefix(remotePort.Name(), "rport-") {
+			continue
+		}
+		log.Debug("Processing fc_remote_port: " + remotePort.Name())
+
+		if !strings.HasPrefix(remotePort.Name(), "rport-") {
+			continue
+		}
+
+		arrayPortNameBytes, err := ioutil.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
+		if err != nil {
+			continue
+		}
+		arrayPortName := strings.TrimSpace(string(arrayPortNameBytes))
+		if !strings.HasPrefix(arrayPortName, FCPortPrefix) {
+			continue
+		}
+
+		// Check that the arrayPortName matches one of our targets
+		for _, tg := range targets {
+			if tg == arrayPortName {
+				split := strings.Split(remotePort.Name(), ":")
+				if len(split) >= 2 {
+					entry := new(targetdev)
+					entry.host = strings.Replace(split[0], "rport-", "host", 1)
+					entry.channel = "-"
+					entry.target = "-"
+					if !duplicates[entry.host] {
+						targetDev = append(targetDev, entry)
+						log.Debug(fmt.Sprintf("Adding target: %s", entry))
+						duplicates[entry.host] = true
+					}
+				}
+			}
+		}
+	}
+	return targetDev, nil
+}
+
+// getIscsiTargetHosts adds the list of the scsi hosts in /sys/class/scsi_host to be rescanned,
+// along with the channel and target, to the targetdev list.
+func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
+	targetDev := make([]*targetdev, 0)
+	if len(targets) == 0 {
+		return targetDev, nil
+	}
 	// Read the sessions.
 	sessionsdir := "/sys/class/iscsi_session"
 	sessions, err := ioutil.ReadDir(sessionsdir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
-		return err
+		return targetDev, err
 	}
 	// Look through the iscsi sessions
 	for _, session := range sessions {
 		if !strings.HasPrefix(session.Name(), "session") {
 			continue
 		}
-		log.Debug("Processing session: " + session.Name())
+		log.Debug("Processing iscsi_session: " + session.Name())
 		if len(targets) > 0 {
 			targetBytes, err := ioutil.ReadFile(sessionsdir + "/" + session.Name() + "/" + "targetname")
 			if err != nil {
@@ -238,59 +419,30 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 					entry.host = "host" + split[0]
 					entry.channel = split[1]
 					entry.target = split[2]
-					targetDevices = append(targetDevices, entry)
-					log.Debug(fmt.Sprintf("Adding targetdev: %#v", entry))
+					targetDev = append(targetDev, entry)
+					log.Debug(fmt.Sprintf("Adding target: %s", entry))
 				}
 				break
 			}
 		}
 	}
+	return targetDev, nil
+}
 
-	hostsdir := "/sys/class/scsi_host"
-	if len(targetDevices) > 0 {
-		for _, entry := range targetDevices {
-			scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, entry.host)
-			scanstring := fmt.Sprintf("%s %s %s", entry.channel, entry.target, lun)
-			log.Printf("rescanning %s with: "+scanstring, scanfile)
-			f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
-			if err != nil {
-				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
-				continue
-			}
-			if _, err := f.WriteString(scanstring); err != nil {
-				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
-			}
-			f.Close()
+// Splits the targeets into those for iscsi or fibre channel
+func splitTargets(targets []string) ([]string, []string) {
+	iscsiTargets := make([]string, 0)
+	fibreChannelTargets := make([]string, 0)
+	for _, target := range targets {
+		if strings.HasPrefix(target, "iqn.") {
+			iscsiTargets = append(iscsiTargets, target)
+		} else if strings.HasPrefix(target, FCPortPrefix) {
+			fibreChannelTargets = append(fibreChannelTargets, target)
+		} else {
+			log.Error("unknown target: " + target)
 		}
-		return nil
 	}
-
-	// Fallback... we didn't find any target devices... so rescan all the hosts
-	// Gather up the host devices.
-	hosts, err := ioutil.ReadDir(hostsdir)
-	if err != nil {
-		log.WithField("error", err).Error("Cannot read directory: " + hostsdir)
-		return err
-	}
-	// For each of the matching hosts, perform a rescan.
-	for _, host := range hosts {
-		if !strings.HasPrefix(host.Name(), "host") {
-			continue
-		}
-		scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, host.Name())
-		scanstring := fmt.Sprintf("- - %s", lun)
-		log.Printf("rescanning %s with: "+scanstring, scanfile)
-		f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
-		if err != nil {
-			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
-			continue
-		}
-		if _, err := f.WriteString(scanstring); err != nil {
-			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
-		}
-		f.Close()
-	}
-	return nil
+	return iscsiTargets, fibreChannelTargets
 }
 
 // removeBlockDevice removes a block device by getting the device name
@@ -302,6 +454,15 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 	devicePathComponents := strings.Split(blockDevicePath, "/")
 	if len(devicePathComponents) > 1 {
 		deviceName := devicePathComponents[len(devicePathComponents)-1]
+		statePath := fmt.Sprintf("/sys/block/%s/device/state", deviceName)
+		stateBytes, err := ioutil.ReadFile(statePath)
+		if err != nil {
+			return fmt.Errorf("Cannot read %s: %s", statePath, err)
+		}
+		deviceState := strings.TrimSpace(string(stateBytes))
+		if deviceState == "blocked" {
+			return fmt.Errorf("Device %s is in blocked state", deviceName)
+		}
 		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
 		f, err := os.OpenFile(blockDeletePath, os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
@@ -316,4 +477,126 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 		}
 	}
 	return nil
+}
+
+// Execute the multipath command with a timeout and various arguments.
+// Optionally a chroot directory can be specified for changing root directory.
+// This only works in a container or another environment where it can chroot to /noderoot.
+// When the -f <dev-name> option has been specified, the flush seems to happen but the
+// command seems to hang. The reason is currently unknown.
+func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutSeconds*time.Second)
+	defer cancel()
+	var cmd *exec.Cmd
+	args := make([]string, 0)
+	if chroot == "" {
+		args = append(args, arguments...)
+		log.Printf("/usr/sbin/multipath %v", args)
+		cmd = exec.CommandContext(ctx, "/usr/sbin/multipath", args...)
+	} else {
+		args = append(args, chroot)
+		args = append(args, "/usr/sbin/multipath")
+		args = append(args, arguments...)
+		log.Printf("/usr/sbin/chroot %v", args)
+		cmd = exec.CommandContext(ctx, "/usr/sbin/chroot", args...)
+	}
+	textBytes, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Error("multipath command failed: " + err.Error())
+	}
+	if len(textBytes) > 0 {
+		log.Debug(fmt.Printf("multipath output: " + string(textBytes)))
+	}
+	return textBytes, err
+}
+
+// getFCHostPortWWNs returns the port WWN addresses of local FC adapters.
+func (fs *FS) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
+	portWWNs := make([]string, 0)
+	// Read the directory entries for fc_remote_ports
+	fcHostsDir := "/sys/class/fc_host"
+	hostEntries, err := ioutil.ReadDir(fcHostsDir)
+	if err != nil {
+		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
+		return portWWNs, err
+	}
+
+	// Look through the hosts retrieving the port_name
+	for _, host := range hostEntries {
+		if !strings.HasPrefix(host.Name(), "host") {
+			continue
+		}
+
+		hostPortNameBytes, err := ioutil.ReadFile(fcHostsDir + "/" + host.Name() + "/" + "port_name")
+		if err != nil {
+			continue
+		}
+		hostPortName := strings.TrimSpace(string(hostPortNameBytes))
+		portWWNs = append(portWWNs, hostPortName)
+	}
+	return portWWNs, nil
+}
+
+// issueLIPToAllFCHosts issues the LIP command to all FC hosts.
+func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
+	var savedError error
+	// Read the directory entries for fc_remote_ports
+	fcHostsDir := "/sys/class/fc_host"
+	fcHostEntries, err := ioutil.ReadDir(fcHostsDir)
+	if err != nil {
+		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
+	}
+
+	// Look through the fc_hosts
+	for _, hostEntry := range fcHostEntries {
+		if !strings.HasPrefix(hostEntry.Name(), "host") {
+			continue
+		}
+
+		lipFile := fmt.Sprintf("%s/%s/issue_lip", fcHostsDir, hostEntry.Name())
+		lipString := fmt.Sprintf("%s", "1")
+		log.Printf("issuing lip command %s to %s", lipString, lipFile)
+		f, err := os.OpenFile(lipFile, os.O_APPEND|os.O_WRONLY, 0200)
+		if err != nil {
+			log.Error("Could not open issue_lip file at: " + lipFile)
+			continue
+		}
+		if _, err := f.WriteString(lipString); err != nil {
+			log.Error(fmt.Sprintf("Error issuing lip at %s: %s", lipFile, err))
+			savedError = err
+		}
+		f.Close()
+	}
+	return savedError
+}
+
+// getSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
+func (fs *FS) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+	start := time.Now()
+	result := make([]string, 0)
+	sysBlockDir := "/sys/block"
+	sysBlocks, err := ioutil.ReadDir(sysBlockDir)
+	if err != nil {
+		return result, fmt.Errorf("Error reading %s: %s", sysBlockDir, err)
+	}
+	for _, sysBlock := range sysBlocks {
+		name := sysBlock.Name()
+		if !strings.HasPrefix(name, "sd") {
+			continue
+		}
+		wwidPath := sysBlockDir + "/" + name + "/device/wwid"
+		bytes, err := ioutil.ReadFile(wwidPath)
+		if err != nil {
+			continue
+		}
+		wwid := strings.TrimSpace(string(bytes))
+		wwid = strings.Replace(wwid, "naa.", "", 1)
+		if wwid == volumeWWN {
+			result = append(result, name)
+		}
+	}
+	end := time.Now()
+	dur := end.Sub(start)
+	log.Printf("getSysBlockDevicesForVolumeWWN %d %f", len(sysBlocks), dur.Seconds())
+	return result, nil
 }

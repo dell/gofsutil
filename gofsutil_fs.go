@@ -1,6 +1,7 @@
 package gofsutil
 
 import "context"
+import "time"
 
 // FS provides many filesystem-specific functions, such as mount, format, etc.
 type FS struct {
@@ -101,8 +102,8 @@ func (fs *FS) ValidateDevice(
 	return fs.validateDevice(ctx, source)
 }
 
-// WWNToDevicePath returns the device path given a LUN's WWN.
-func (fs *FS) WWNToDevicePath(ctx context.Context, wwn string) (string, error) {
+// WWNToDevicePath returns the symlink and device path given a LUN's WWN.
+func (fs *FS) WWNToDevicePath(ctx context.Context, wwn string) (string, string, error) {
 	return fs.wwnToDevicePath(ctx, wwn)
 }
 
@@ -119,4 +120,32 @@ func (fs *FS) RescanSCSIHost(ctx context.Context, targets []string, lun string) 
 // device by writing '1' to /sys/block{deviceName}/device/delete
 func (fs *FS) RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
 	return fs.removeBlockDevice(ctx, blockDevicePath)
+}
+
+// Execute the multipath command with a timeout and various arguments.
+// Optionally a chroot directory can be specified for changing root directory.
+// This only works in a container or another environment where it can chroot to /noderoot.
+func (fs *FS) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	return fs.multipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+}
+
+// TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
+// and a LUN id. It returns the entry name in /dev/disk/by-path and the device path, along with error.
+func (fs *FS) TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+	return fs.targetIPLUNToDevicePath(ctx, targetIP, lunID)
+}
+
+// GetFCHostPortWWNs returns the port WWN addresses of local FC adapters.
+func (fs *FS) GetFCHostPortWWNs(ctx context.Context) ([]string, error) {
+	return fs.getFCHostPortWWNs(ctx)
+}
+
+// IssueLIPToAllFCHosts issues the LIP command to all FC hosts.
+func (fs *FS) IssueLIPToAllFCHosts(ctx context.Context) error {
+	return fs.issueLIPToAllFCHosts(ctx)
+}
+
+// GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
+func (fs *FS) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+	return fs.getSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
 }
