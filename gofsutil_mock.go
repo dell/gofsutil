@@ -21,29 +21,37 @@ var (
 	GOFSMockWWNToDevice map[string]string
 	// GOFSWWNPath gives a path for the WWN entry (e.g. /dev/disk/by-id/wwn-0x)
 	GOFSWWNPath string
-	// GOFSTargetIPLUNToDevice map[string]string
+	// GOFSMockTargetIPLUNToDevice map[string]string
 	// assumes key is of form ip-<targetIP>:-lun<decimal_lun_id>
 	GOFSMockTargetIPLUNToDevice map[string]string
 	// GOFSRescanCallback is a function called when a rescan is processed.
 	GOFSRescanCallback func(scan string)
+	// GOFSMockMountInfo contains mount information for filesystem volumes
+	GOFSMockMountInfo *DeviceMountInfo
+
 	// GOFSMock allows you to induce errors in the various routine.
 	GOFSMock struct {
-		InduceBindMountError           bool
-		InduceMountError               bool
-		InduceGetMountsError           bool
-		InduceDevMountsError           bool
-		InduceUnmountError             bool
-		InduceFormatError              bool
-		InduceGetDiskFormatError       bool
-		InduceWWNToDevicePathError     bool
-		InduceTargetIPLUNToDeviceError bool
-		InduceRemoveBlockDeviceError   bool
-		InduceMultipathCommandError    bool
-		InduceFCHostWWNsError          bool
-		InduceRescanError              bool
-		InduceIssueLipError            bool
-		InduceGetSysBlockDevicesError  bool
-		InduceGetDiskFormatType        string
+		InduceBindMountError              bool
+		InduceMountError                  bool
+		InduceGetMountsError              bool
+		InduceDevMountsError              bool
+		InduceUnmountError                bool
+		InduceFormatError                 bool
+		InduceGetDiskFormatError          bool
+		InduceWWNToDevicePathError        bool
+		InduceTargetIPLUNToDeviceError    bool
+		InduceRemoveBlockDeviceError      bool
+		InduceMultipathCommandError       bool
+		InduceFCHostWWNsError             bool
+		InduceRescanError                 bool
+		InduceIssueLipError               bool
+		InduceGetSysBlockDevicesError     bool
+		InduceGetDiskFormatType           string
+		InduceGetMountInfoFromDeviceError bool
+		InduceDeviceRescanError           bool
+		InduceResizeMultipathError        bool
+		InduceFSTypeError                 bool
+		InduceResizeFSError               bool
 	}
 )
 
@@ -109,6 +117,66 @@ func (fs *mockfs) bindMount(ctx context.Context, source, target string, opts ...
 	return nil
 }
 
+func (fs *mockfs) DeviceRescan(ctx context.Context, devicePath string) error {
+	return fs.deviceRescan(ctx, devicePath)
+}
+
+func (fs *mockfs) deviceRescan(ctx context.Context, devicePath string) error {
+	if GOFSMock.InduceDeviceRescanError {
+		return errors.New("DeviceRescan induced error: Failed to rescan device")
+	}
+	return nil
+}
+
+func (fs *mockfs) ResizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error {
+	return fs.resizeFS(ctx, volumePath, devicePath, mpathDevice, fsType)
+}
+
+func (fs *mockfs) resizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error {
+	if GOFSMock.InduceResizeFSError {
+		return errors.New("resizeFS induced error:	Failed to resize device")
+	}
+	return nil
+}
+
+func (fs *mockfs) FindFSType(ctx context.Context, mountpoint string) (fsType string, err error) {
+	return fs.findFSType(ctx, mountpoint)
+}
+
+func (fs *mockfs) findFSType(ctx context.Context, mountpoint string) (fsType string, err error) {
+	if GOFSMock.InduceFSTypeError {
+		return "", errors.New("getMounts induced error: Failed to fetch filesystem as no mount info")
+	}
+	return "xfs", nil
+}
+
+func (fs *mockfs) GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
+	return fs.getMountInfoFromDevice(ctx, devID)
+}
+
+func (fs *mockfs) getMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
+	if GOFSMock.InduceGetMountInfoFromDeviceError {
+		return GOFSMockMountInfo, errors.New("getMounts induced error: Failed to find mount information")
+	}
+	mntPoint := "/noderoot/var/lib/kubelet/pods/abc-123/volumes/k8.io/pmax-0123/mount"
+	GOFSMockMountInfo = &DeviceMountInfo{
+		DeviceNames: []string{"sda", "sdb"},
+		MPathName:   "mpathb",
+		MountPoint:  mntPoint,
+	}
+	return GOFSMockMountInfo, nil
+}
+
+func (fs *mockfs) ResizeMultipath(ctx context.Context, deviceName string) error {
+	return fs.resizeMultipath(ctx, deviceName)
+}
+
+func (fs *mockfs) resizeMultipath(ctx context.Context, deviceName string) error {
+	if GOFSMock.InduceResizeMultipathError {
+		return errors.New("resize multipath induced error: Failed to resize multipath mount device")
+	}
+	return nil
+}
 func (fs *mockfs) getMounts(ctx context.Context) ([]Info, error) {
 	if GOFSMock.InduceGetMountsError {
 		return GOFSMockMounts, errors.New("getMounts induced error")

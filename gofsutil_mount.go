@@ -55,6 +55,14 @@ type Info struct {
 	Opts []string
 }
 
+//DeviceMountInfo describes the filesystem mount information
+//related to the mounted CSI device
+type DeviceMountInfo struct {
+	DeviceNames []string
+	MPathName   string
+	MountPoint  string
+}
+
 // Entry is a superset of Info and maps to the fields of a mount table
 // entry:
 //

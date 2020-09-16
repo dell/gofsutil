@@ -24,6 +24,30 @@ func (fs *FS) bindMount(ctx context.Context, source, target string, opts ...stri
 	return errors.New("not implemented")
 }
 
+//resizeFS expands the filesystem to the new size of underlying device
+func (fs *FS) resizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error {
+	return errors.New("not implemented")
+}
+
+//findFSType fetches the filesystem type on mountpoint
+func (fs *FS) findFSType(
+	ctx context.Context, mountpoint string) (fsType string, err error) {
+	return "", errors.New("not implemented")
+}
+func (fs *FS) getMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
+	return errors.New("not implemented")
+}
+
+//DeviceRescan rescan the device for size alterations
+func (fs *FS) deviceRescan(ctx context.Context,
+	devicePath string) error {
+	return errors.New("not implemented")
+}
+
 func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
 
 	return info, errors.New("not implemented")

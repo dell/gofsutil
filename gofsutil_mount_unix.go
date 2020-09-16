@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -50,7 +51,7 @@ func (fs *FS) doMount(
 		"args": args,
 	}
 	log.WithFields(f).Info("mount command")
-
+	/* #nosec G204 */
 	buf, err := exec.Command(mntCmd, mountArgs...).CombinedOutput()
 	if err != nil {
 		out := string(buf)
@@ -70,6 +71,7 @@ func (fs *FS) unmount(ctx context.Context, target string) error {
 		"cmd":  "umount",
 	}
 	log.WithFields(f).Info("unmount command")
+	/* #nosec G204 */
 	buf, err := exec.Command("umount", target).CombinedOutput()
 	if err != nil {
 		out := string(buf)
@@ -189,8 +191,8 @@ func (fs *FS) targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunI
 	for _, entry := range entries {
 		name := entry.Name()
 		// Looking for entries of these forms:
-		// ip-10.247.73.127:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0 -> ../../sdc
-		// ip-10.247.73.127:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0x0101000000000000 -> ../../sdro
+		// ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0 -> ../../sdc
+		// ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0x0101000000000000 -> ../../sdro
 		if !strings.HasPrefix(name, "ip-"+targetIP+":") {
 			continue
 		}
@@ -272,7 +274,10 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 			if _, err := f.WriteString(scanstring); err != nil {
 				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
 			}
-			f.Close()
+                        errs := f.Close()
+                        if errs != nil {
+                                return err
+                        }
 		}
 		return nil
 	}
@@ -301,7 +306,10 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 		if _, err := f.WriteString(scanstring); err != nil {
 			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
 		}
-		f.Close()
+                errs := f.Close()
+                if errs != nil {
+                	return err
+                }
 	}
 	return nil
 }
@@ -455,7 +463,7 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 	if len(devicePathComponents) > 1 {
 		deviceName := devicePathComponents[len(devicePathComponents)-1]
 		statePath := fmt.Sprintf("/sys/block/%s/device/state", deviceName)
-		stateBytes, err := ioutil.ReadFile(statePath)
+		stateBytes, err := ioutil.ReadFile(filepath.Clean(statePath))
 		if err != nil {
 			return fmt.Errorf("Cannot read %s: %s", statePath, err)
 		}
@@ -473,7 +481,10 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 			if _, err := f.WriteString("1"); err != nil {
 				log.WithField("BlockDeletePath", blockDeletePath).Error("Could not write to block device delete path")
 			}
-			f.Close()
+			err := f.Close()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -492,12 +503,14 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 	if chroot == "" {
 		args = append(args, arguments...)
 		log.Printf("/usr/sbin/multipath %v", args)
+		/* #nosec G204 */
 		cmd = exec.CommandContext(ctx, "/usr/sbin/multipath", args...)
 	} else {
 		args = append(args, chroot)
 		args = append(args, "/usr/sbin/multipath")
 		args = append(args, arguments...)
 		log.Printf("/usr/sbin/chroot %v", args)
+		/* #nosec G204 */
 		cmd = exec.CommandContext(ctx, "/usr/sbin/chroot", args...)
 	}
 	textBytes, err := cmd.CombinedOutput()
@@ -565,7 +578,10 @@ func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
 			log.Error(fmt.Sprintf("Error issuing lip at %s: %s", lipFile, err))
 			savedError = err
 		}
-		f.Close()
+                errs := f.Close()
+                if errs != nil {
+                	return err
+                }
 	}
 	return savedError
 }
@@ -585,7 +601,7 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN stri
 			continue
 		}
 		wwidPath := sysBlockDir + "/" + name + "/device/wwid"
-		bytes, err := ioutil.ReadFile(wwidPath)
+		bytes, err := ioutil.ReadFile(filepath.Clean(wwidPath))
 		if err != nil {
 			continue
 		}
