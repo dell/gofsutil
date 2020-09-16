@@ -7,7 +7,9 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
+	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -33,6 +35,7 @@ func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 	}
 	log.WithFields(f).WithField("args", args).Info(
 		"checking if disk is formatted using lsblk")
+	/* #nosec G204 */
 	buf, err := exec.Command("lsblk", args...).CombinedOutput()
 	out := string(buf)
 	log.WithField("output", out).Debug("lsblk output")
@@ -129,7 +132,8 @@ func (fs *FS) formatAndMount(
 		log.WithFields(f).Info(
 			"disk appears unformatted, attempting format")
 
-		mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
+		mkfsCmd := fmt.Sprintf("mkfs.%s", fsType) 
+		/* #nosec G204 */
 		if err := exec.Command(mkfsCmd, args...).Run(); err != nil {
 			log.WithFields(f).WithError(err).Error(
 				"format of disk failed")
@@ -197,6 +201,7 @@ func (fs *FS) format(
 
 	mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
 	log.Printf("formatting with command: %s %v", mkfsCmd, args)
+	/* #nosec G204 */
 	err := exec.Command(mkfsCmd, args...).Run()
 	if err != nil {
 		log.WithFields(f).WithError(err).Error(
@@ -219,13 +224,166 @@ func (fs *FS) bindMount(
 	return fs.doMount(ctx, "mount", source, target, "", opts...)
 }
 
+func (fs *FS) getMountInfoFromDevice(
+	ctx context.Context, devID string) (*DeviceMountInfo, error) {
+	var cmd string
+	/* #nosec G204 */
+        checkCmd := "lsblk -P | awk '/mpath.+" + devID + "/ {print $0}'"
+	/* #nosec G204 */
+        buf, err := exec.Command("bash", "-c", checkCmd).Output()
+        if err != nil {
+                return nil, err
+        }
+        output := string(buf)
+        fmt.Println("Check: "+ checkCmd)
+        if output != "" {
+                cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+        } else {
+		/* #nosec G204 */
+                cmd = "lsblk -P | awk '/" + devID + "/ {print $0}'"
+        }
+        fmt.Println(cmd)
+	/* #nosec G204 */
+        buf, err = exec.Command("bash", "-c", cmd).Output()
+        if err != nil {
+                return nil, err
+        }
+        output = string(buf)
+        if output == "" {
+                return nil, fmt.Errorf("Device not found")
+        }
+	sdDeviceRegx := regexp.MustCompile(`NAME=\"sd\S+\"`)
+	mpathDeviceRegx := regexp.MustCompile(`NAME=\"mpath\S+\"`)
+	mountRegx := regexp.MustCompile(`MOUNTPOINT=\"\S+\"`)
+	deviceTypeRegx := regexp.MustCompile(`TYPE=\"mpath"`)
+	deviceNameRegx := regexp.MustCompile(`NAME=\"\S+\"`)
+	mountPoint := mountRegx.FindString(output)
+	devices := sdDeviceRegx.FindAllString(output, 99999)
+	mpath := mpathDeviceRegx.FindString(output)
+	mountInfo := new(DeviceMountInfo)
+	mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
+
+	for _, device := range devices {
+		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
+	}
+	if mpath != "" {
+		mountInfo.MPathName = strings.Split(mpath, "\"")[1]
+	} else {
+		//In case the mpath device is of the form /dev/mapper/3600601xxxxxxx 
+		//we check if TYPE is "mpath" then we pick the first mapper device name from NAME
+		for _, deviceInfo := range strings.Split(output, "\n") {
+			deviceType := deviceTypeRegx.FindString(deviceInfo)
+			if deviceType != "" {
+				name := deviceNameRegx.FindString(deviceInfo)
+				if name != "" {
+					mountInfo.MPathName = strings.Split(name, "\"")[1]
+					break
+				}
+			}
+		}
+	}
+	return mountInfo, nil
+}
+
+//FindFSType fetches the filesystem type on mountpoint
+func (fs *FS) findFSType(
+	ctx context.Context, mountpoint string) (fsType string, err error) {
+	cmd := "findmnt -n " + mountpoint + " | awk '{print $3}'"
+	/* #nosec G204 */
+	buf, err := exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		return "", fmt.Errorf("Failed to find mount information for (%s) error (%v)", mountpoint, err)
+	}
+	fsType = strings.TrimSuffix(string(buf), "\n")
+	return
+}
+
+func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
+	args := []string{"resize", "map", deviceName}
+	/* #nosec G204 */
+	out, err := exec.Command("multipathd", args...).CombinedOutput()
+	log.WithField("output", string(out)).Debug("Multipath resize output")
+	if err != nil {
+		return fmt.Errorf("Failed to resize multipath mount device on (%s) error (%v)", deviceName, err)
+	}
+	log.Infof("Filesystem on %s resized successfully", deviceName)
+	return nil
+}
+
+//resizeFS expands the filesystem to the new size of underlying device
+//For XFS filesystem needs filesystem mount point
+//For EXT4 needs devicepath
+//For EXT3 needs devicepath
+//For multipath device, fs resize needs "/device/mapper/mpathname"
+func (fs *FS) resizeFS(
+	ctx context.Context, mountpoint,
+	devicePath, mpathDevice, fsType string) error {
+	if mpathDevice != "" {
+		devicePath = "/dev/mapper/" + mpathDevice
+		mountpoint = devicePath
+	}
+	var err error
+	switch fsType {
+	case "ext4":
+		err = fs.expandExtFs(devicePath)
+	case "ext3":
+		err = fs.expandExtFs(devicePath)
+	case "xfs":
+		err = fs.expandXfs(mountpoint)
+	default:
+		err = fmt.Errorf("Filesystem not supported to resize")
+	}
+	return err
+}
+
+func (fs *FS) expandExtFs(devicePath string) error {
+	/* #nosec G204 */
+	out, err := exec.Command("resize2fs", devicePath).CombinedOutput()
+	log.WithField("output", string(out)).Debug("Ext fs resize output")
+	if err != nil {
+		return fmt.Errorf("Ext fs: Failed to resize device (%s) error (%v)", devicePath, err)
+	}
+	log.Infof("Ext fs: Device %s resized successfully", devicePath)
+	return nil
+}
+
+func (fs *FS) expandXfs(volumePath string) error {
+	args := []string{"-d", volumePath}
+	/* #nosec G204 */
+	out, err := exec.Command("xfs_growfs", args...).CombinedOutput()
+	log.WithField("output", string(out)).Debug("XFS resize output")
+	if err != nil {
+		return fmt.Errorf("Xfs: Failed to resize device (%s) error (%v)", volumePath, err)
+	}
+	log.Infof("Xfs: Device %s resized successfully", volumePath)
+	return nil
+}
+
+//DeviceRescan rescan the device for size alterations
+func (fs *FS) deviceRescan(ctx context.Context,
+	devicePath string) error {
+	device := devicePath + "/device/rescan"
+	args := []string{"-c", "echo 1 > " + device}
+	log.Infof("Executing rescan command on device (%s)", devicePath)
+	/* #nosec G204 */
+	buf, err := exec.Command("bash", args...).CombinedOutput()
+	out := string(buf)
+	log.WithField("output", out).Debug("Rescan output")
+	if err != nil {
+		log.Error("Failed to rescan device with error (%s)", err.Error())
+		return err
+	}
+	log.Info("Successful rescan on device (%s)", devicePath)
+	return nil
+}
+
 func (fs *FS) consistentRead(filename string, retry int) ([]byte, error) {
-	oldContent, err := ioutil.ReadFile(filename)
+	oldContent, err := ioutil.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < retry; i++ {
-		newContent, err := ioutil.ReadFile(filename)
+	for i := 0; i < retry; i++ { 
+		newContent, err := ioutil.ReadFile(filepath.Clean(filename))
 		if err != nil {
 			return nil, err
 		}
@@ -256,12 +414,10 @@ func (fs *FS) readProcMounts(
 	ctx context.Context,
 	path string,
 	info bool) ([]Info, uint32, error) {
-
-	file, err := os.Open(path)
+	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
-		return nil, 0, err
+		return nil,0, err
 	}
-	defer file.Close()
-
+	defer func() error { if err := file.Close(); err != nil { return err } else {return nil} } ()
 	return ReadProcMountsFrom(ctx, file, !info, ProcMountsFields, fs.ScanEntry)
 }

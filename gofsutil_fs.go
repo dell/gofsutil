@@ -1,7 +1,9 @@
 package gofsutil
 
-import "context"
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // FS provides many filesystem-specific functions, such as mount, format, etc.
 type FS struct {
@@ -68,6 +70,36 @@ func (fs *FS) BindMount(
 // Unmount unmounts the target.
 func (fs *FS) Unmount(ctx context.Context, target string) error {
 	return fs.unmount(ctx, target)
+}
+
+//GetMountInfoFromDevice retrieves mount information associated with the volume
+func (fs *FS) GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
+	return fs.getMountInfoFromDevice(ctx, devID)
+}
+
+//ResizeFS expands the filesystem to the new size of underlying device
+func (fs *FS) ResizeFS(
+	ctx context.Context,
+	volumePath, devicePath,
+	mpathDevice, fsType string) error {
+	return fs.resizeFS(ctx, volumePath, devicePath, mpathDevice, fsType)
+}
+
+//FindFSType fetches the filesystem type on mountpoint
+func (fs *FS) FindFSType(
+	ctx context.Context, mountpoint string) (fsType string, err error) {
+	return fs.findFSType(ctx, mountpoint)
+}
+
+//ResizeMultipath resizes the multipath devices mounted on FS
+func (fs *FS) ResizeMultipath(ctx context.Context, deviceName string) error {
+	return fs.ResizeMultipath(ctx, deviceName)
+}
+
+//DeviceRescan rescan the device for size alterations
+func (fs *FS) DeviceRescan(ctx context.Context,
+	devicePath string) error {
+	return fs.deviceRescan(ctx, devicePath)
 }
 
 // GetMounts returns a slice of all the mounted filesystems.
