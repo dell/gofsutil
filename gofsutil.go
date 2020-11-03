@@ -33,6 +33,7 @@ type FSinterface interface {
 	getMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error)
 	resizeMultipath(ctx context.Context, deviceName string) error
 	findFSType(ctx context.Context, mountpoint string) (fsType string, err error)
+	getMpathNameFromDevice(ctx context.Context, device string) (string, error)
 
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
@@ -57,6 +58,7 @@ type FSinterface interface {
 	GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error)
 	ResizeMultipath(ctx context.Context, deviceName string) error
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
+	GetMpathNameFromDevice(ctx context.Context, device string) (string, error)
 }
 
 var (
@@ -143,6 +145,11 @@ func Unmount(ctx context.Context, target string) error {
 //GetMountInfoFromDevice retrieves mount information associated with the volume
 func GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
 	return fs.GetMountInfoFromDevice(ctx, devID)
+}
+
+//GetMpathNameFromDevice retrieves mpath device name from device name
+func GetMpathNameFromDevice(ctx context.Context, device string) (string, error) {
+	return fs.getMpathNameFromDevice(ctx, device)
 }
 
 //ResizeFS expands the filesystem to the new size of underlying device

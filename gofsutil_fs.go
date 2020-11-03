@@ -77,6 +77,11 @@ func (fs *FS) GetMountInfoFromDevice(ctx context.Context, devID string) (*Device
 	return fs.getMountInfoFromDevice(ctx, devID)
 }
 
+//GetMpathNameFromDevice retrieves mpath device name from device name
+func (fs *FS) GetMpathNameFromDevice(ctx context.Context, device string) (string, error) {
+	return fs.getMpathNameFromDevice(ctx, device)
+}
+
 //ResizeFS expands the filesystem to the new size of underlying device
 func (fs *FS) ResizeFS(
 	ctx context.Context,

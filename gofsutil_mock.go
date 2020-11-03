@@ -52,6 +52,7 @@ var (
 		InduceResizeMultipathError        bool
 		InduceFSTypeError                 bool
 		InduceResizeFSError               bool
+		IndueGetMpathNameFromDeviceError  bool
 	}
 )
 
@@ -165,6 +166,18 @@ func (fs *mockfs) getMountInfoFromDevice(ctx context.Context, devID string) (*De
 		MountPoint:  mntPoint,
 	}
 	return GOFSMockMountInfo, nil
+}
+
+func (fs *mockfs) GetMpathNameFromDevice(ctx context.Context, devID string) (string, error) {
+	return fs.getMpathNameFromDevice(ctx, devID)
+}
+
+func (fs *mockfs) getMpathNameFromDevice(ctx context.Context, devID string) (string, error) {
+	if GOFSMock.IndueGetMpathNameFromDeviceError {
+		return "", errors.New("getMpathNameFromDevice induced error: Failed to find mount information")
+	}
+
+	return "mpatha", nil
 }
 
 func (fs *mockfs) ResizeMultipath(ctx context.Context, deviceName string) error {
