@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -274,10 +274,10 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 			if _, err := f.WriteString(scanstring); err != nil {
 				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
 			}
-                        errs := f.Close()
-                        if errs != nil {
-                                return err
-                        }
+			errs := f.Close()
+			if errs != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -306,10 +306,10 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 		if _, err := f.WriteString(scanstring); err != nil {
 			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
 		}
-                errs := f.Close()
-                if errs != nil {
-                	return err
-                }
+		errs := f.Close()
+		if errs != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -578,10 +578,10 @@ func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
 			log.Error(fmt.Sprintf("Error issuing lip at %s: %s", lipFile, err))
 			savedError = err
 		}
-                errs := f.Close()
-                if errs != nil {
-                	return err
-                }
+		errs := f.Close()
+		if errs != nil {
+			return err
+		}
 	}
 	return savedError
 }

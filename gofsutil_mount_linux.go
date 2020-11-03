@@ -7,9 +7,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"regexp"
-	"strings"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -128,11 +129,16 @@ func (fs *FS) formatAndMount(
 			args = []string{"-K", source}
 		}
 
+		if fsType == "xfs" {
+			args = append(args, "-m", "crc=0,finobt=0")
+
+		}
+
 		f["fsType"] = fsType
 		log.WithFields(f).Info(
 			"disk appears unformatted, attempting format")
 
-		mkfsCmd := fmt.Sprintf("mkfs.%s", fsType) 
+		mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
 		/* #nosec G204 */
 		if err := exec.Command(mkfsCmd, args...).Run(); err != nil {
 			log.WithFields(f).WithError(err).Error(
@@ -224,34 +230,101 @@ func (fs *FS) bindMount(
 	return fs.doMount(ctx, "mount", source, target, "", opts...)
 }
 
+//isLsblkNew returns true if lsblk version is greater than 2.3 and false otherwise
+func (fs *FS) isLsblkNew() (bool, error) {
+	lsblkNew := false
+	checkVersCmd := "lsblk -V"
+	bufcheck, errcheck := exec.Command("bash", "-c", checkVersCmd).Output()
+	if errcheck != nil {
+		return lsblkNew, errcheck
+	}
+	outputcheck := string(bufcheck)
+	versionRegx := regexp.MustCompile(`linux (?P<vers>\d+\.\d+)\.*`)
+	match := versionRegx.FindStringSubmatch(outputcheck)
+	subMatchMap := make(map[string]string)
+	for i, name := range versionRegx.SubexpNames() {
+		if i != 0 {
+			subMatchMap[name] = match[i]
+		}
+	}
+	if s, err := strconv.ParseFloat(subMatchMap["vers"], 64); err == nil {
+		fmt.Println(s)
+		if s > 2.30 { //need to check exact version
+			lsblkNew = true
+		}
+	}
+	return lsblkNew, nil
+}
+
+func (fs *FS) getMpathNameFromDevice(
+	ctx context.Context, device string) (string, error) {
+	var cmd string
+	lsblkNew, err := fs.isLsblkNew()
+	if err != nil {
+		return "", err
+	}
+	if lsblkNew {
+		cmd = "lsblk -Px MODE | awk '/" + device + "/{c=2}c&&c--' | grep TYPE=\\\"mpath\\\""
+	} else {
+		cmd = "lsblk -P | awk '/" + device + "/{c=2}c&&c--' | grep TYPE=\\\"mpath\\\""
+	}
+	fmt.Println(cmd)
+
+	/* #nosec G204 */
+	buf, err := exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		return "", err
+	}
+	output := string(buf)
+	if output == "" {
+		return "", fmt.Errorf("device %s not found", device)
+	}
+
+	mpathDeviceRegx := regexp.MustCompile(`NAME="\S+"`)
+	mpath := mpathDeviceRegx.FindString(output)
+	if mpath != "" {
+		return strings.Split(mpath, "\"")[1], nil
+	}
+
+	return "", nil
+}
+
 func (fs *FS) getMountInfoFromDevice(
 	ctx context.Context, devID string) (*DeviceMountInfo, error) {
 	var cmd string
+	lsblkNew, err := fs.isLsblkNew()
+	if err != nil {
+		return nil, err
+	}
 	/* #nosec G204 */
-        checkCmd := "lsblk -P | awk '/mpath.+" + devID + "/ {print $0}'"
+	checkCmd := "lsblk -P | awk '/mpath.+" + devID + "/ {print $0}'"
 	/* #nosec G204 */
-        buf, err := exec.Command("bash", "-c", checkCmd).Output()
-        if err != nil {
-                return nil, err
-        }
-        output := string(buf)
-        fmt.Println("Check: "+ checkCmd)
-        if output != "" {
-                cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
-        } else {
+	buf, err := exec.Command("bash", "-c", checkCmd).Output()
+	if err != nil {
+		return nil, err
+	}
+	output := string(buf)
+	fmt.Println("Check: " + checkCmd)
+	if output != "" {
+		if lsblkNew {
+			cmd = "lsblk -Px MODE | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+		} else {
+			cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+		}
+	} else {
 		/* #nosec G204 */
-                cmd = "lsblk -P | awk '/" + devID + "/ {print $0}'"
-        }
-        fmt.Println(cmd)
+		cmd = "lsblk -P | awk '/" + devID + "/ {print $0}'"
+	}
+	fmt.Println(cmd)
 	/* #nosec G204 */
-        buf, err = exec.Command("bash", "-c", cmd).Output()
-        if err != nil {
-                return nil, err
-        }
-        output = string(buf)
-        if output == "" {
-                return nil, fmt.Errorf("Device not found")
-        }
+	buf, err = exec.Command("bash", "-c", cmd).Output()
+	if err != nil {
+		return nil, err
+	}
+	output = string(buf)
+	if output == "" {
+		return nil, fmt.Errorf("Device not found")
+	}
 	sdDeviceRegx := regexp.MustCompile(`NAME=\"sd\S+\"`)
 	mpathDeviceRegx := regexp.MustCompile(`NAME=\"mpath\S+\"`)
 	mountRegx := regexp.MustCompile(`MOUNTPOINT=\"\S+\"`)
@@ -269,7 +342,7 @@ func (fs *FS) getMountInfoFromDevice(
 	if mpath != "" {
 		mountInfo.MPathName = strings.Split(mpath, "\"")[1]
 	} else {
-		//In case the mpath device is of the form /dev/mapper/3600601xxxxxxx 
+		//In case the mpath device is of the form /dev/mapper/3600601xxxxxxx
 		//we check if TYPE is "mpath" then we pick the first mapper device name from NAME
 		for _, deviceInfo := range strings.Split(output, "\n") {
 			deviceType := deviceTypeRegx.FindString(deviceInfo)
@@ -382,7 +455,7 @@ func (fs *FS) consistentRead(filename string, retry int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < retry; i++ { 
+	for i := 0; i < retry; i++ {
 		newContent, err := ioutil.ReadFile(filepath.Clean(filename))
 		if err != nil {
 			return nil, err
@@ -416,8 +489,14 @@ func (fs *FS) readProcMounts(
 	info bool) ([]Info, uint32, error) {
 	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
-		return nil,0, err
+		return nil, 0, err
 	}
-	defer func() error { if err := file.Close(); err != nil { return err } else {return nil} } ()
+	defer func() error {
+		if err := file.Close(); err != nil {
+			return err
+		} else {
+			return nil
+		}
+	}()
 	return ReadProcMountsFrom(ctx, file, !info, ProcMountsFields, fs.ScanEntry)
 }

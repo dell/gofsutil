@@ -38,6 +38,10 @@ func (fs *FS) getMountInfoFromDevice(ctx context.Context, devID string) (*Device
 	return nil, errors.New("not implemented")
 }
 
+func (fs *FS) getMpathNameFromDevice(ctx context.Context, device string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
 func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
 	return errors.New("not implemented")
 }
