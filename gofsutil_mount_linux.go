@@ -271,15 +271,8 @@ func (fs *FS) getMpathNameFromDevice(
 	fmt.Println(cmd)
 
 	/* #nosec G204 */
-	buf, err := exec.Command("bash", "-c", cmd).Output()
-	if err != nil {
-		return "", err
-	}
+	buf, _ := exec.Command("bash", "-c", cmd).Output()
 	output := string(buf)
-	if output == "" {
-		return "", fmt.Errorf("device %s not found", device)
-	}
-
 	mpathDeviceRegx := regexp.MustCompile(`NAME="\S+"`)
 	mpath := mpathDeviceRegx.FindString(output)
 	if mpath != "" {
@@ -443,10 +436,10 @@ func (fs *FS) deviceRescan(ctx context.Context,
 	out := string(buf)
 	log.WithField("output", out).Debug("Rescan output")
 	if err != nil {
-		log.Error("Failed to rescan device with error (%s)", err.Error())
+		log.Errorf("Failed to rescan device with error (%s)", err.Error())
 		return err
 	}
-	log.Info("Successful rescan on device (%s)", devicePath)
+	log.Infof("Successful rescan on device (%s)", devicePath)
 	return nil
 }
 
