@@ -98,7 +98,7 @@ func (fs *FS) FindFSType(
 
 //ResizeMultipath resizes the multipath devices mounted on FS
 func (fs *FS) ResizeMultipath(ctx context.Context, deviceName string) error {
-	return fs.ResizeMultipath(ctx, deviceName)
+	return fs.resizeMultipath(ctx, deviceName)
 }
 
 //DeviceRescan rescan the device for size alterations
