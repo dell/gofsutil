@@ -77,6 +77,18 @@ func (fs *FS) formatAndMount(
 	reqID := ctx.Value(ContextKey(RequestID))
 	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
+	// retrive and remove fsFormatOption from opts if it is passed in
+	var fsFormatOptionString string
+	var fsFormatOption []string
+	if len(opts) > 0 {
+		fsFormatOptionString = opts[len(opts)-1]
+		if strings.HasPrefix(fsFormatOptionString, "fsFormatOption:") {
+			fsFormatOptionString = strings.TrimPrefix(fsFormatOptionString, "fsFormatOption")
+			fsFormatOption = strings.Split(fsFormatOptionString, " ")
+			opts = opts[0 : len(opts)-1]
+		}
+	}
+
 	opts = append(opts, "defaults")
 	f := log.Fields{
 		"reqID":   reqID,
@@ -101,6 +113,7 @@ func (fs *FS) formatAndMount(
 		log.WithFields(f).Info("error determining disk format")
 		return err
 	}
+
 	f = log.Fields{
 		"reqID":          reqID,
 		"source":         source,
@@ -116,38 +129,56 @@ func (fs *FS) formatAndMount(
 			fsType = "ext4"
 		}
 
-		if fsType == "ext4" || fsType == "ext3" {
-			args = []string{"-F", source}
-			if noDiscard == NoDiscard {
-				// -E nodiscard option to improve mkfs times
-				args = []string{"-F", "-E", "nodiscard", source}
+		// if no fs format option is provided
+		if len(fsFormatOption) == 0 {
+			if fsType == "ext4" || fsType == "ext3" {
+				args = []string{"-F", source}
+				if noDiscard == NoDiscard {
+					// -E nodiscard option to improve mkfs times
+					args = []string{"-F", "-E", "nodiscard", source}
+				}
 			}
-		}
 
-		if fsType == "xfs" && noDiscard == NoDiscard {
-			// -K option (nodiscard) to improve mkfs times
-			args = []string{"-K", source}
-		}
+			if fsType == "xfs" && noDiscard == NoDiscard {
+				// -K option (nodiscard) to improve mkfs times
+				args = []string{"-K", source}
+			}
 
-		if fsType == "xfs" {
-			args = append(args, "-m", "crc=0,finobt=0")
+			if fsType == "xfs" {
+				args = append(args, "-m", "crc=0")
+			}
+		} else {
+			// user provides format option
+			if noDiscard == NoDiscard {
+				if fsType == "ext4" || fsType == "ext3" {
+					args = append(fsFormatOption, "-E", "nodiscard", source)
+				}
 
+				if fsType == "xfs" {
+					args = append(fsFormatOption, "-K", source)
+				}
+			} else {
+				args = append(fsFormatOption, source)
+			}
 		}
 
 		f["fsType"] = fsType
 		log.WithFields(f).Info(
 			"disk appears unformatted, attempting format")
 
+		log.Printf("mkfs args: %v", args)
+
 		mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
 		/* #nosec G204 */
 		if err := exec.Command(mkfsCmd, args...).Run(); err != nil {
 			log.WithFields(f).WithError(err).Error(
 				"format of disk failed")
+		} else {
+			log.WithFields(f).Info("disk successfully formatted")
 		}
 
-		// the disk has been formatted successfully try to mount it again.
-		log.WithFields(f).Info(
-			"disk successfully formatted")
+		// a format of the disk has been attempted, so try mounting it again
+		log.WithFields(f).Info("re-attempting disk mount")
 		return fs.mount(ctx, source, target, fsType, opts...)
 	}
 
