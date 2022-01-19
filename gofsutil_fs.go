@@ -167,7 +167,6 @@ func (fs *FS) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration
 	return fs.multipathCommand(ctx, timeoutSeconds, chroot, arguments...)
 }
 
-// This function borrowed from https://github.com/kubernetes/kubernetes/blob/master/pkg/volume/util/fs/fs.go#L40
 // Info linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
 func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
