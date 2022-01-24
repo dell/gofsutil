@@ -34,6 +34,7 @@ type FSinterface interface {
 	resizeMultipath(ctx context.Context, deviceName string) error
 	findFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	getMpathNameFromDevice(ctx context.Context, device string) (string, error)
+	fsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error)
 
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
@@ -59,6 +60,7 @@ type FSinterface interface {
 	ResizeMultipath(ctx context.Context, deviceName string) error
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	GetMpathNameFromDevice(ctx context.Context, device string) (string, error)
+	FsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error)
 }
 
 var (
@@ -274,4 +276,9 @@ func IssueLIPToAllFCHosts(ctx context.Context) error {
 // GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
 func GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
 	return fs.GetSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
+}
+
+// FsInfo given the path of the filesystem will return its stats
+func FsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error) {
+	return fs.fsInfo(ctx, path)
 }
