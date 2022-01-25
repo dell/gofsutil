@@ -34,7 +34,7 @@ type FSinterface interface {
 	resizeMultipath(ctx context.Context, deviceName string) error
 	findFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	getMpathNameFromDevice(ctx context.Context, device string) (string, error)
-	fsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error)
+	fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
 
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
@@ -60,10 +60,11 @@ type FSinterface interface {
 	ResizeMultipath(ctx context.Context, deviceName string) error
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	GetMpathNameFromDevice(ctx context.Context, device string) (string, error)
-	FsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error)
+	FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
 }
 
 var (
+	// MultipathDevDiskByIDPrefix is a variable
 	MultipathDevDiskByIDPrefix = "/dev/disk/by-id/dm-uuid-mpath-3"
 )
 
@@ -76,10 +77,10 @@ var (
 	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
 )
 
-// Type of variable containing context-keys
+// ContextKey is a variable containing context-keys
 type ContextKey string
 
-// Context option for using the nodiscard flag on mkfs
+// NoDiscard is a context option for using the nodiscard flag on mkfs
 const NoDiscard = "NoDiscard"
 
 // UseMockFS creates a mock file system for testing. This then is used
@@ -250,7 +251,7 @@ func RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
 	return fs.RemoveBlockDevice(ctx, blockDevicePath)
 }
 
-// Execute the multipath command with a timeout and various arguments.
+// MultipathCommand executes the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
 func MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
@@ -279,6 +280,6 @@ func GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]st
 }
 
 // FsInfo given the path of the filesystem will return its stats
-func FsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error) {
+func FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.fsInfo(ctx, path)
 }

@@ -181,11 +181,11 @@ func (fs *mockfs) getMpathNameFromDevice(ctx context.Context, devID string) (str
 	return "mpatha", nil
 }
 
-func (fs *mockfs) FsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error) {
+func (fs *mockfs) FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.fsInfo(ctx, path)
 }
 
-func (fs *mockfs) fsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error) {
+func (fs *mockfs) fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	if GOFSMock.InduceFilesystemInfoError {
 		return 0, 0, 0, 0, 0, 0, errors.New("filesystemInfo induced error: Failed to get fileystem stats")
 	}

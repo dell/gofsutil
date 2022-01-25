@@ -161,16 +161,16 @@ func (fs *FS) RemoveBlockDevice(ctx context.Context, blockDevicePath string) err
 	return fs.removeBlockDevice(ctx, blockDevicePath)
 }
 
-// Execute the multipath command with a timeout and various arguments.
+// MultipathCommand executes the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
 func (fs *FS) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
 	return fs.multipathCommand(ctx, timeoutSeconds, chroot, arguments...)
 }
 
-// Info linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// fsInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func (fs *FS) fsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error) {
+func (fs *FS) fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
@@ -178,16 +178,16 @@ func (fs *FS) fsInfo(ctx context.Context, path string) (uint64, uint64, uint64, 
 	}
 
 	// Available is blocks available * fragment size
-	available := statfs.Bavail * uint64(statfs.Bsize)
+	available := int64(statfs.Bavail) * int64(statfs.Bsize)
 
 	// Capacity is total block count * fragment size
-	capacity := statfs.Blocks * uint64(statfs.Bsize)
+	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
 
 	// Usage is block being used * fragment size (aka block size).
-	usage := (statfs.Blocks - uint64(statfs.Bfree)) * uint64(statfs.Bsize)
+	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
-	inodes := statfs.Files
-	inodesFree := statfs.Ffree
+	inodes := int64(statfs.Files)
+	inodesFree := int64(statfs.Ffree)
 	inodesUsed := inodes - inodesFree
 
 	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
@@ -215,6 +215,6 @@ func (fs *FS) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN stri
 }
 
 // FsInfo given the path of the filesystem will return its stats
-func (fs *FS) FsInfo(ctx context.Context, path string) (uint64, uint64, uint64, uint64, uint64, uint64, error) {
+func (fs *FS) FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.fsInfo(ctx, path)
 }
