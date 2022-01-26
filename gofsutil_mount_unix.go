@@ -314,7 +314,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 	return nil
 }
 
-// FCPortPrefix is a variable
+// FCPortPrefix has the required port prefix for FCTargetHosts
 const FCPortPrefix = "0x50"
 
 // getFCTargetHosts adds the list of the fibre channel hosts in /sys/class/scsi_host to be rescanned,
