@@ -3,6 +3,7 @@ package gofsutil
 import (
 	"context"
 	"time"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -169,7 +170,7 @@ func (fs *FS) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration
 
 // Info linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+func fsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
@@ -211,4 +212,9 @@ func (fs *FS) IssueLIPToAllFCHosts(ctx context.Context) error {
 // GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
 func (fs *FS) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
 	return fs.getSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
+}
+
+// FsInfo given the path of the filesystem will return its stats
+func (fs *FS) FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+	return fs.fsInfo(ctx, path)
 }

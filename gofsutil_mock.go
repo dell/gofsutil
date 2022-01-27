@@ -52,7 +52,8 @@ var (
 		InduceResizeMultipathError        bool
 		InduceFSTypeError                 bool
 		InduceResizeFSError               bool
-		IndueGetMpathNameFromDeviceError  bool
+		InduceGetMpathNameFromDeviceError bool
+		InduceFilesystemInfoError         bool
 	}
 )
 
@@ -173,11 +174,22 @@ func (fs *mockfs) GetMpathNameFromDevice(ctx context.Context, devID string) (str
 }
 
 func (fs *mockfs) getMpathNameFromDevice(ctx context.Context, devID string) (string, error) {
-	if GOFSMock.IndueGetMpathNameFromDeviceError {
+	if GOFSMock.InduceGetMpathNameFromDeviceError {
 		return "", errors.New("getMpathNameFromDevice induced error: Failed to find mount information")
 	}
 
 	return "mpatha", nil
+}
+
+func (fs *mockfs) FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+	return fs.fsInfo(ctx, path)
+}
+
+func (fs *mockfs) fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+	if GOFSMock.InduceFilesystemInfoError {
+		return 0, 0, 0, 0, 0, 0, errors.New("filesystemInfo induced error: Failed to get fileystem stats")
+	}
+	return 1000, 2000, 1000, 4, 2, 2, nil
 }
 
 func (fs *mockfs) ResizeMultipath(ctx context.Context, deviceName string) error {
