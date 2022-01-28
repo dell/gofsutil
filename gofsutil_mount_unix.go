@@ -482,7 +482,7 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 		if _, err := f.WriteString("1"); err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not write to block device delete path")
 		}
-		err := f.Close()
+		err = f.Close()
 		if err != nil {
 			return err
 		}
