@@ -66,7 +66,7 @@ func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 	return "unknown data, probably partitions", nil
 }
 
-// Log the CSI or other type of Request ID
+// RequestID is for logging the CSI or other type of Request ID
 const RequestID = "RequestID"
 
 // formatAndMount uses unix utils to format and mount the given disk
@@ -518,9 +518,8 @@ func (fs *FS) readProcMounts(
 	defer func() error {
 		if err := file.Close(); err != nil {
 			return err
-		} else {
-			return nil
 		}
+		return nil
 	}()
 	return ReadProcMountsFrom(ctx, file, !info, ProcMountsFields, fs.ScanEntry)
 }

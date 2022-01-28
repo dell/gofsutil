@@ -64,6 +64,7 @@ type FSinterface interface {
 }
 
 var (
+	// MultipathDevDiskByIDPrefix is a pathname prefix for items located in /dev/disk/by-id
 	MultipathDevDiskByIDPrefix = "/dev/disk/by-id/dm-uuid-mpath-3"
 )
 
@@ -76,10 +77,10 @@ var (
 	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
 )
 
-// Type of variable containing context-keys
+// ContextKey is a variable containing context-keys
 type ContextKey string
 
-// Context option for using the nodiscard flag on mkfs
+// NoDiscard is a context option for using the nodiscard flag on mkfs
 const NoDiscard = "NoDiscard"
 
 // UseMockFS creates a mock file system for testing. This then is used
@@ -250,7 +251,7 @@ func RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
 	return fs.RemoveBlockDevice(ctx, blockDevicePath)
 }
 
-// Execute the multipath command with a timeout and various arguments.
+// MultipathCommand executes the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
 func MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {

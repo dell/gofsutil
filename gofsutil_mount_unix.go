@@ -1,3 +1,4 @@
+//go:build linux || darwin
 // +build linux darwin
 
 package gofsutil
@@ -314,6 +315,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 	return nil
 }
 
+// FCPortPrefix has the required port prefix for FCTargetHosts
 const FCPortPrefix = "0x50"
 
 // getFCTargetHosts adds the list of the fibre channel hosts in /sys/class/scsi_host to be rescanned,
@@ -476,15 +478,14 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 		if err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")
 			return err
-		} else {
-			log.WithField("BlockDeletePath", blockDeletePath).Info("Writing '1' to block device delete path")
-			if _, err := f.WriteString("1"); err != nil {
-				log.WithField("BlockDeletePath", blockDeletePath).Error("Could not write to block device delete path")
-			}
-			err := f.Close()
-			if err != nil {
-				return err
-			}
+		}
+		log.WithField("BlockDeletePath", blockDeletePath).Info("Writing '1' to block device delete path")
+		if _, err := f.WriteString("1"); err != nil {
+			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not write to block device delete path")
+		}
+		err = f.Close()
+		if err != nil {
+			return err
 		}
 	}
 	return nil
