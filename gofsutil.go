@@ -64,7 +64,7 @@ type FSinterface interface {
 }
 
 var (
-	// MultipathDevDiskByIDPrefix is a variable
+	// MultipathDevDiskByIDPrefix is a pathname prefix for items located in /dev/disk/by-id
 	MultipathDevDiskByIDPrefix = "/dev/disk/by-id/dm-uuid-mpath-3"
 )
 
