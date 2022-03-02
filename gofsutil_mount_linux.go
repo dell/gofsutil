@@ -350,17 +350,22 @@ func (fs *FS) getMountInfoFromDevice(
 		return nil, fmt.Errorf("Device not found")
 	}
 	sdDeviceRegx := regexp.MustCompile(`NAME=\"sd\S+\"`)
+	nvmeDeviceRegx := regexp.MustCompile(`NAME=\"nvme\S+\"`)
 	mpathDeviceRegx := regexp.MustCompile(`NAME=\"mpath\S+\"`)
 	mountRegx := regexp.MustCompile(`MOUNTPOINT=\"\S+\"`)
 	deviceTypeRegx := regexp.MustCompile(`TYPE=\"mpath"`)
 	deviceNameRegx := regexp.MustCompile(`NAME=\"\S+\"`)
 	mountPoint := mountRegx.FindString(output)
 	devices := sdDeviceRegx.FindAllString(output, 99999)
+	nvmeDevices := nvmeDeviceRegx.FindAllString(output, 99999)
 	mpath := mpathDeviceRegx.FindString(output)
 	mountInfo := new(DeviceMountInfo)
 	mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
 
 	for _, device := range devices {
+		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
+	}
+	for _, device := range nvmeDevices {
 		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
 	}
 	if mpath != "" {
