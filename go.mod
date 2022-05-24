@@ -1,6 +1,6 @@
 module github.com/dell/gofsutil
 
-go 1.17
+go 1.18
 
 require (
 	github.com/sirupsen/logrus v0.0.0-20170822132746-89742aefa4b2
