@@ -1,9 +1,9 @@
 name: Workflow
 on:
   push:
-    branches: [ main ]
+    branches: [ gosec-updates ]
   pull_request:
-    branches: [ main ]
+    branches: [ gosec-updates ]
 jobs:
   code-check:
     name: Check Go formatting, linting, vetting
@@ -23,8 +23,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Run Go Security
         uses: securego/gosec@master
-        with:
-          args: -exclude=G304 ./...
+        #with:
+          #args: -exclude=G304 ./...
   malware_security_scan:
     name: Malware Scanner
     runs-on: ubuntu-latest
