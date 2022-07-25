@@ -52,8 +52,10 @@ func (fs *FS) validateMountArgs(source, target, fsType string, opts ...string) e
 		return err
 	}
 
-	if err := validateFsType(fsType); err != nil {
-		return err
+	if fsType != "" {
+		if err := validateFsType(fsType); err != nil {
+			return err
+		}
 	}
 
 	if err := validateMountOptions(opts...); err != nil {
