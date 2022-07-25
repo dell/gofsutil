@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -38,11 +39,39 @@ func (fs *FS) mount(
 	return fs.doMount(ctx, "mount", source, target, fsType, opts...)
 }
 
+func (fs *FS) validateMountArgs(source, target, fsType string, opts ...string) error {
+
+	sourcePath := filepath.Clean(source)
+	targetPath := filepath.Clean(target)
+
+	if err := validatePath(sourcePath); err != nil {
+		return err
+	}
+
+	if err := validatePath(targetPath); err != nil {
+		return err
+	}
+
+	if err := validateFsType(fsType); err != nil {
+		return err
+	}
+
+	if err := validateMountOptions(opts...); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // doMount runs the mount command.
 func (fs *FS) doMount(
 	ctx context.Context,
 	mntCmd, source, target, fsType string,
 	opts ...string) error {
+
+	if err := fs.validateMountArgs(source, target, fsType, opts...); err != nil {
+		return err
+	}
 
 	mountArgs := MakeMountArgs(ctx, source, target, fsType, opts...)
 	args := strings.Join(mountArgs, " ")
@@ -71,16 +100,18 @@ func (fs *FS) unmount(ctx context.Context, target string) error {
 		"path": target,
 		"cmd":  "umount",
 	}
-	log.WithFields(f).Info("unmount command")
-	/* #nosec G204 */
-	buf, err := exec.Command("umount", target).CombinedOutput()
+	log.WithFields(f).Info("unmount syscall")
+	path := filepath.Clean(target)
+	if err := validatePath(path); err != nil {
+		return err
+	}
+
+	err := syscall.Unmount(path, 0)
 	if err != nil {
-		out := string(buf)
-		f["output"] = out
 		log.WithFields(f).WithError(err).Error("unmount failed")
 		return fmt.Errorf(
-			"unmount failed: %v\nunmounting arguments: %s\nOutput: %s",
-			err, target, out)
+			"unmount failed: %v\nunmounting arguments: %s",
+			err, target)
 	}
 	return nil
 }
@@ -267,7 +298,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 			scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, entry.host)
 			scanstring := fmt.Sprintf("%s %s %s", entry.channel, entry.target, lun)
 			log.Printf("rescanning %s with: "+scanstring, scanfile)
-			f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
+			f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0200)
 			if err != nil {
 				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
 				continue
@@ -299,7 +330,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 		scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, host.Name())
 		scanstring := fmt.Sprintf("- - %s", lun)
 		log.Printf("rescanning %s with: "+scanstring, scanfile)
-		f, err := os.OpenFile(scanfile, os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
 			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
 			continue
@@ -474,7 +505,7 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 			return fmt.Errorf("Device %s is in blocked state", deviceName)
 		}
 		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
-		f, err := os.OpenFile(blockDeletePath, os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")
 			return err
@@ -570,7 +601,7 @@ func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
 		lipFile := fmt.Sprintf("%s/%s/issue_lip", fcHostsDir, hostEntry.Name())
 		lipString := fmt.Sprintf("%s", "1")
 		log.Printf("issuing lip command %s to %s", lipString, lipFile)
-		f, err := os.OpenFile(lipFile, os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filepath.Clean(lipFile), os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
 			log.Error("Could not open issue_lip file at: " + lipFile)
 			continue
