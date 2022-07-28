@@ -2,6 +2,7 @@ package gofsutil
 
 import (
 	"errors"
+	"path/filepath"
 	"regexp"
 )
 
@@ -29,5 +30,22 @@ func validateMountOptions(mountOptions ...string) error {
 			return errors.New("Mount option: " + opt + " is invalid")
 		}
 	}
+	return nil
+}
+
+func validateMultipathArgs(options ...string) error {
+	for _, opt := range options {
+		// check for options
+		matched, err := regexp.Match(`[[-][AaBbCcdFfhilpqrTtUuWw0-9]+]*[0-9]*`, []byte(opt))
+		if matched && err == nil {
+			continue
+		}
+
+		// check for file or device path
+		if err := validatePath(filepath.Clean(opt)); err != nil {
+			return errors.New("Multipath option: " + opt + " is invalid")
+		}
+	}
+
 	return nil
 }

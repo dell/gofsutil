@@ -534,6 +534,11 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 	defer cancel()
 	var cmd *exec.Cmd
 	args := make([]string, 0)
+
+	if err := validateMultipathArgs(arguments...); err != nil {
+		return nil, err
+	}
+
 	if chroot == "" {
 		args = append(args, arguments...)
 		log.Printf("/usr/sbin/multipath %v", args)
