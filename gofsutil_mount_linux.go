@@ -29,10 +29,9 @@ var (
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
 func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 
-	disk = filepath.Clean(disk)
-	err := validatePath(disk)
-	if err != nil {
-		return "", fmt.Errorf("Failed to validate disk: %s error %v", disk, err)
+	path := filepath.Clean(disk)
+	if err := validatePath(path); err != nil {
+		return "", err
 	}
 
 	args := []string{"-n", "-o", "FSTYPE", disk}
@@ -72,32 +71,6 @@ func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 	return "unknown data, probably partitions", nil
 }
 
-func (fs *FS) validateFormatAndMountArgs(source, target, fsType string, opts ...string) error {
-
-	sourcePath := filepath.Clean(source)
-	targetPath := filepath.Clean(target)
-
-	if err := validatePath(sourcePath); err != nil {
-		return err
-	}
-
-	if err := validatePath(targetPath); err != nil {
-		return err
-	}
-
-	if fsType != "" {
-		if err := validateFsType(fsType); err != nil {
-			return err
-		}
-	}
-
-	if err := validateMountOptions(opts...); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // RequestID is for logging the CSI or other type of Request ID
 const RequestID = "RequestID"
 
@@ -107,7 +80,7 @@ func (fs *FS) formatAndMount(
 	source, target, fsType string,
 	opts ...string) error {
 
-	err := fs.validateFormatAndMountArgs(source, target, fsType, opts...)
+	err := fs.validateMountArgs(source, target, fsType, opts...)
 	if err != nil {
 		return err
 	}
@@ -334,10 +307,9 @@ func (fs *FS) isLsblkNew() (bool, error) {
 func (fs *FS) getMpathNameFromDevice(
 	ctx context.Context, device string) (string, error) {
 
-	device = filepath.Clean(device)
-	err := validatePath(device)
-	if err != nil {
-		return "", fmt.Errorf("Failed to validate device: %s error %v", device, err)
+	path := filepath.Clean(device)
+	if err := validatePath(path); err != nil {
+		return "", err
 	}
 
 	var cmd string
@@ -366,10 +338,9 @@ func (fs *FS) getMpathNameFromDevice(
 func (fs *FS) getMountInfoFromDevice(
 	ctx context.Context, devID string) (*DeviceMountInfo, error) {
 
-	devID = filepath.Clean(devID)
-	err := validatePath(devID)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to validate devID: %s error %v", devID, err)
+	path := filepath.Clean(devID)
+	if err := validatePath(path); err != nil {
+		return nil, err
 	}
 
 	var cmd string
