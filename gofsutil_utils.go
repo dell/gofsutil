@@ -25,7 +25,7 @@ func validateFsType(fsType string) error {
 
 func validateMountOptions(mountOptions ...string) error {
 	for _, opt := range mountOptions {
-		matched, err := regexp.Match(`[\w]*[=]*[\w]*`, []byte(opt))
+		matched, err := regexp.Match(`[\w]+[=]*[\w]*`, []byte(opt))
 		if !matched || err != nil {
 			return errors.New("Mount option: " + opt + " is invalid")
 		}

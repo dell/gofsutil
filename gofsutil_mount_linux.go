@@ -29,6 +29,12 @@ var (
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
 func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 
+	disk = filepath.Clean(disk)
+	err := validatePath(disk)
+	if err != nil {
+		return "", fmt.Errorf("Failed to validate disk: %s error %v", disk, err)
+	}
+
 	args := []string{"-n", "-o", "FSTYPE", disk}
 
 	f := log.Fields{
@@ -66,6 +72,32 @@ func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 	return "unknown data, probably partitions", nil
 }
 
+func (fs *FS) validateFormatAndMountArgs(source, target, fsType string, opts ...string) error {
+
+	sourcePath := filepath.Clean(source)
+	targetPath := filepath.Clean(target)
+
+	if err := validatePath(sourcePath); err != nil {
+		return err
+	}
+
+	if err := validatePath(targetPath); err != nil {
+		return err
+	}
+
+	if fsType != "" {
+		if err := validateFsType(fsType); err != nil {
+			return err
+		}
+	}
+
+	if err := validateMountOptions(opts...); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // RequestID is for logging the CSI or other type of Request ID
 const RequestID = "RequestID"
 
@@ -74,6 +106,12 @@ func (fs *FS) formatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string) error {
+
+	err := fs.validateFormatAndMountArgs(source, target, fsType, opts...)
+	if err != nil {
+		return err
+	}
+
 	reqID := ctx.Value(ContextKey(RequestID))
 	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
@@ -200,6 +238,12 @@ func (fs *FS) format(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string) error {
+
+	err := fs.validateMountArgs(source, target, fsType, opts...)
+	if err != nil {
+		return err
+	}
+
 	reqID := ctx.Value(ContextKey("RequestID"))
 	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
@@ -239,7 +283,7 @@ func (fs *FS) format(
 	mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
 	log.Printf("formatting with command: %s %v", mkfsCmd, args)
 	/* #nosec G204 */
-	err := exec.Command(mkfsCmd, args...).Run()
+	err = exec.Command(mkfsCmd, args...).Run()
 	if err != nil {
 		log.WithFields(f).WithError(err).Error(
 			"format of disk failed")
@@ -289,6 +333,13 @@ func (fs *FS) isLsblkNew() (bool, error) {
 
 func (fs *FS) getMpathNameFromDevice(
 	ctx context.Context, device string) (string, error) {
+
+	device = filepath.Clean(device)
+	err := validatePath(device)
+	if err != nil {
+		return "", fmt.Errorf("Failed to validate device: %s error %v", device, err)
+	}
+
 	var cmd string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
@@ -314,6 +365,13 @@ func (fs *FS) getMpathNameFromDevice(
 
 func (fs *FS) getMountInfoFromDevice(
 	ctx context.Context, devID string) (*DeviceMountInfo, error) {
+
+	devID = filepath.Clean(devID)
+	err := validatePath(devID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to validate devID: %s error %v", devID, err)
+	}
+
 	var cmd string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
