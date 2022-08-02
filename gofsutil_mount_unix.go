@@ -39,6 +39,7 @@ func (fs *FS) mount(
 	return fs.doMount(ctx, "mount", source, target, fsType, opts...)
 }
 
+// validateMountArgs validates the arguments for mount operation.
 func (fs *FS) validateMountArgs(source, target, fsType string, opts ...string) error {
 
 	sourcePath := filepath.Clean(source)
