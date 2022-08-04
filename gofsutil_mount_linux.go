@@ -29,6 +29,11 @@ var (
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
 func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 
+	path := filepath.Clean(disk)
+	if err := validatePath(path); err != nil {
+		return "", err
+	}
+
 	args := []string{"-n", "-o", "FSTYPE", disk}
 
 	f := log.Fields{
@@ -74,6 +79,12 @@ func (fs *FS) formatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string) error {
+
+	err := fs.validateMountArgs(source, target, fsType, opts...)
+	if err != nil {
+		return err
+	}
+
 	reqID := ctx.Value(ContextKey(RequestID))
 	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
@@ -200,6 +211,12 @@ func (fs *FS) format(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string) error {
+
+	err := fs.validateMountArgs(source, target, fsType, opts...)
+	if err != nil {
+		return err
+	}
+
 	reqID := ctx.Value(ContextKey("RequestID"))
 	noDiscard := ctx.Value(ContextKey(NoDiscard))
 
@@ -239,7 +256,7 @@ func (fs *FS) format(
 	mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
 	log.Printf("formatting with command: %s %v", mkfsCmd, args)
 	/* #nosec G204 */
-	err := exec.Command(mkfsCmd, args...).Run()
+	err = exec.Command(mkfsCmd, args...).Run()
 	if err != nil {
 		log.WithFields(f).WithError(err).Error(
 			"format of disk failed")
@@ -289,6 +306,12 @@ func (fs *FS) isLsblkNew() (bool, error) {
 
 func (fs *FS) getMpathNameFromDevice(
 	ctx context.Context, device string) (string, error) {
+
+	path := filepath.Clean(device)
+	if err := validatePath(path); err != nil {
+		return "", err
+	}
+
 	var cmd string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
@@ -301,7 +324,6 @@ func (fs *FS) getMpathNameFromDevice(
 	}
 	fmt.Println(cmd)
 
-	/* #nosec G204 */
 	buf, _ := exec.Command("bash", "-c", cmd).Output()
 	output := string(buf)
 	mpathDeviceRegx := regexp.MustCompile(`NAME="\S+"`)
@@ -315,6 +337,12 @@ func (fs *FS) getMpathNameFromDevice(
 
 func (fs *FS) getMountInfoFromDevice(
 	ctx context.Context, devID string) (*DeviceMountInfo, error) {
+
+	path := filepath.Clean(devID)
+	if err := validatePath(path); err != nil {
+		return nil, err
+	}
+
 	var cmd string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
@@ -390,7 +418,12 @@ func (fs *FS) getMountInfoFromDevice(
 //FindFSType fetches the filesystem type on mountpoint
 func (fs *FS) findFSType(
 	ctx context.Context, mountpoint string) (fsType string, err error) {
-	cmd := "findmnt -n " + mountpoint + " | awk '{print $3}'"
+	path := filepath.Clean(mountpoint)
+	if err := validatePath(path); err != nil {
+		return "", fmt.Errorf("Failed to validate path: %s error %v", mountpoint, err)
+	}
+
+	cmd := "findmnt -n \"" + path + "\" | awk '{print $3}'"
 	/* #nosec G204 */
 	buf, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
@@ -401,7 +434,12 @@ func (fs *FS) findFSType(
 }
 
 func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
-	args := []string{"resize", "map", deviceName}
+	path := filepath.Clean(deviceName)
+	if err := validatePath(path); err != nil {
+		return fmt.Errorf("Failed to validate path: %s error %v", deviceName, err)
+	}
+
+	args := []string{"resize", "map", path}
 	/* #nosec G204 */
 	out, err := exec.Command("multipathd", args...).CombinedOutput()
 	log.WithField("output", string(out)).Debug("Multipath resize output")
@@ -439,8 +477,12 @@ func (fs *FS) resizeFS(
 }
 
 func (fs *FS) expandExtFs(devicePath string) error {
+	path := filepath.Clean(devicePath)
+	if err := validatePath(path); err != nil {
+		return fmt.Errorf("Failed to validate path: %s error %v", devicePath, err)
+	}
 	/* #nosec G204 */
-	out, err := exec.Command("resize2fs", devicePath).CombinedOutput()
+	out, err := exec.Command("resize2fs", path).CombinedOutput()
 	log.WithField("output", string(out)).Debug("Ext fs resize output")
 	if err != nil {
 		return fmt.Errorf("Ext fs: Failed to resize device (%s) error (%v)", devicePath, err)
@@ -450,7 +492,11 @@ func (fs *FS) expandExtFs(devicePath string) error {
 }
 
 func (fs *FS) expandXfs(volumePath string) error {
-	args := []string{"-d", volumePath}
+	path := filepath.Clean(volumePath)
+	if err := validatePath(path); err != nil {
+		return fmt.Errorf("Failed to validate path: %s error %v", volumePath, err)
+	}
+	args := []string{"-d", path}
 	/* #nosec G204 */
 	out, err := exec.Command("xfs_growfs", args...).CombinedOutput()
 	log.WithField("output", string(out)).Debug("XFS resize output")
@@ -464,7 +510,11 @@ func (fs *FS) expandXfs(volumePath string) error {
 //DeviceRescan rescan the device for size alterations
 func (fs *FS) deviceRescan(ctx context.Context,
 	devicePath string) error {
-	device := devicePath + "/device/rescan"
+	path := filepath.Clean(devicePath)
+	if err := validatePath(path); err != nil {
+		return err
+	}
+	device := path + "/device/rescan"
 	args := []string{"-c", "echo 1 > " + device}
 	log.Infof("Executing rescan command on device (%s)", devicePath)
 	/* #nosec G204 */
