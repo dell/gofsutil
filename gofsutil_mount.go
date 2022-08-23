@@ -60,6 +60,7 @@ type Info struct {
 type DeviceMountInfo struct {
 	DeviceNames []string
 	MPathName   string
+	PPathName   string
 	MountPoint  string
 }
 

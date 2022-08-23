@@ -29,7 +29,7 @@ type FSinterface interface {
 	issueLIPToAllFCHosts(ctx context.Context) error
 	getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
 	deviceRescan(ctx context.Context, devicePath string) error
-	resizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error
+	resizeFS(ctx context.Context, volumePath, devicePath, ppathDevice, mpathDevice, fsType string) error
 	getMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error)
 	resizeMultipath(ctx context.Context, deviceName string) error
 	findFSType(ctx context.Context, mountpoint string) (fsType string, err error)
@@ -55,7 +55,7 @@ type FSinterface interface {
 	IssueLIPToAllFCHosts(ctx context.Context) error
 	GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
 	DeviceRescan(ctx context.Context, devicePath string) error
-	ResizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error
+	ResizeFS(ctx context.Context, volumePath, devicePath, ppathDevice, mpathDevice, fsType string) error
 	GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error)
 	ResizeMultipath(ctx context.Context, deviceName string) error
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
@@ -158,9 +158,9 @@ func GetMpathNameFromDevice(ctx context.Context, device string) (string, error) 
 //ResizeFS expands the filesystem to the new size of underlying device
 func ResizeFS(
 	ctx context.Context,
-	volumePath, devicePath,
+	volumePath, devicePath, ppathDevice,
 	mpathDevice, fsType string) error {
-	return fs.resizeFS(ctx, volumePath, devicePath, mpathDevice, fsType)
+	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
 //ResizeMultipath expands the multipath volumes

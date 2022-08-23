@@ -20,6 +20,7 @@ const (
 	// procMountsRetries is number of times to retry for a consistent
 	// read of procMountsPath.
 	procMountsRetries = 30
+	powerpathtool     = "powermt"
 )
 
 var (
@@ -335,6 +336,37 @@ func (fs *FS) getMpathNameFromDevice(
 	return "", nil
 }
 
+func (fs *FS) getNativeDevicesFromPpath(
+	ctx context.Context, ppath string) ([]string, error) {
+	log.Infof("powerpath - trying to find native devices for ppath: %s", ppath)
+	var devices []string
+	deviceName := fmt.Sprintf("dev=%s", ppath)
+	cmd := fmt.Sprintf("%s/%s", "/noderoot/usr/sbin", powerpathtool)
+	log.Debug("*** cmd:", cmd)
+	out, err := exec.Command(cmd, "display", deviceName).CombinedOutput()
+	if err != nil {
+		log.Errorf("Error powermt display %s: %v", deviceName, err)
+		return devices, err
+	}
+	op := strings.Split(string(out), "\n")
+	fmt.Printf("lines %+v \n", op)
+	/* Output for powermt display dev=ppath
+	L#0 Pseudo name=emcpowerc
+	L#1 Symmetrix ID=000197901586
+	L#10 ...
+	==============================================================================
+	  3  lpfc                  sdbb        FA  2d:04 active   alive       0      0
+	  3  lpfc                  sdba        FA  1d:04 active   alive       0      0
+	*/
+	for _, line := range op {
+		if strings.Contains(line, "sd") {
+			tokens := strings.Fields(line)
+			devices = append(devices, tokens[2])
+		}
+	}
+	return devices, nil
+}
+
 func (fs *FS) getMountInfoFromDevice(
 	ctx context.Context, devID string) (*DeviceMountInfo, error) {
 
@@ -344,42 +376,62 @@ func (fs *FS) getMountInfoFromDevice(
 	}
 
 	var cmd string
+	var output string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("device ID from getMountInfoFromDevice is %s", devID)
 	/* #nosec G204 */
-	checkCmd := "lsblk -P | awk '/mpath.+" + devID + "/ {print $0}'"
+	checkCmd := "lsblk -P | awk '/emcpower.+" + devID + "/ {print $0}'"
+	log.Infof("checkcommand values is %s", checkCmd)
 	/* #nosec G204 */
 	buf, err := exec.Command("bash", "-c", checkCmd).Output()
 	if err != nil {
 		return nil, err
 	}
-	output := string(buf)
-	fmt.Println("Check: " + checkCmd)
-	if output != "" {
-		if lsblkNew {
-			cmd = "lsblk -Px MODE | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
-		} else {
-			cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
-		}
-	} else {
-		/* #nosec G204 */
-		cmd = "lsblk -P | awk '/" + devID + "/ {print $0}'"
-	}
-	fmt.Println(cmd)
-	/* #nosec G204 */
-	buf, err = exec.Command("bash", "-c", cmd).Output()
-	if err != nil {
-		return nil, err
-	}
 	output = string(buf)
+	log.Infof("powerpath exec command output is : %+v", output)
+	if output == "" {
+		/* #nosec G204 */
+		checkCmd = "lsblk -P | awk '/mpath.+" + devID + "/ {print $0}'"
+		log.Infof("checkcommand values is %s", checkCmd)
+
+		/* #nosec G204 */
+		buf, err = exec.Command("bash", "-c", checkCmd).Output()
+		if err != nil {
+			return nil, err
+		}
+		log.Infof("multipath exec command output is : %+v", buf)
+
+		output := string(buf)
+		fmt.Println("Check: " + checkCmd)
+		if output != "" {
+			if lsblkNew {
+				cmd = "lsblk -Px MODE | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+			} else {
+				cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+			}
+		} else {
+			/* #nosec G204 */
+			cmd = "lsblk -P | awk '/" + devID + "/ {print $0}'"
+		}
+		log.Infof("command output is %s", cmd)
+		fmt.Println(cmd)
+		/* #nosec G204 */
+		buf, err = exec.Command("bash", "-c", cmd).Output()
+		if err != nil {
+			return nil, err
+		}
+		output = string(buf)
+	}
 	if output == "" {
 		return nil, fmt.Errorf("Device not found")
 	}
 	sdDeviceRegx := regexp.MustCompile(`NAME=\"sd\S+\"`)
 	nvmeDeviceRegx := regexp.MustCompile(`NAME=\"nvme\S+\"`)
 	mpathDeviceRegx := regexp.MustCompile(`NAME=\"mpath\S+\"`)
+	ppathDeviceRegx := regexp.MustCompile(`NAME=\"emcpower\S+\"`)
 	mountRegx := regexp.MustCompile(`MOUNTPOINT=\"\S+\"`)
 	deviceTypeRegx := regexp.MustCompile(`TYPE=\"mpath"`)
 	deviceNameRegx := regexp.MustCompile(`NAME=\"\S+\"`)
@@ -387,16 +439,24 @@ func (fs *FS) getMountInfoFromDevice(
 	devices := sdDeviceRegx.FindAllString(output, 99999)
 	nvmeDevices := nvmeDeviceRegx.FindAllString(output, 99999)
 	mpath := mpathDeviceRegx.FindString(output)
+	ppath := ppathDeviceRegx.FindString(output)
 	mountInfo := new(DeviceMountInfo)
 	mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
-
+	log.Infof("ppath values is %s", ppath)
 	for _, device := range devices {
 		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
 	}
 	for _, device := range nvmeDevices {
 		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
 	}
-	if mpath != "" {
+	if ppath != "" {
+		mountInfo.PPathName = strings.Split(ppath, "\"")[1]
+		// find native devices for given ppath
+		mountInfo.DeviceNames, err = fs.getNativeDevicesFromPpath(ctx, mountInfo.PPathName)
+		if err != nil {
+			return nil, err
+		}
+	} else if mpath != "" {
 		mountInfo.MPathName = strings.Split(mpath, "\"")[1]
 	} else {
 		//In case the mpath device is of the form /dev/mapper/3600601xxxxxxx
@@ -455,9 +515,16 @@ func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
 //For EXT4 needs devicepath
 //For EXT3 needs devicepath
 //For multipath device, fs resize needs "/device/mapper/mpathname"
+//For powerpath device, fs resize needs "/dev/emcpowera"
+
 func (fs *FS) resizeFS(
 	ctx context.Context, mountpoint,
-	devicePath, mpathDevice, fsType string) error {
+	devicePath, ppathDevice, mpathDevice, fsType string) error {
+	if ppathDevice != "" {
+		devicePath = "/dev/" + ppathDevice
+		mountpoint = devicePath
+	}
+
 	if mpathDevice != "" {
 		devicePath = "/dev/mapper/" + mpathDevice
 		mountpoint = devicePath
