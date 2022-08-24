@@ -87,9 +87,9 @@ func (fs *FS) GetMpathNameFromDevice(ctx context.Context, device string) (string
 //ResizeFS expands the filesystem to the new size of underlying device
 func (fs *FS) ResizeFS(
 	ctx context.Context,
-	volumePath, devicePath,
+	volumePath, devicePath, ppathDevice,
 	mpathDevice, fsType string) error {
-	return fs.resizeFS(ctx, volumePath, devicePath, mpathDevice, fsType)
+	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
 //FindFSType fetches the filesystem type on mountpoint

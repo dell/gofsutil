@@ -130,11 +130,11 @@ func (fs *mockfs) deviceRescan(ctx context.Context, devicePath string) error {
 	return nil
 }
 
-func (fs *mockfs) ResizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error {
-	return fs.resizeFS(ctx, volumePath, devicePath, mpathDevice, fsType)
+func (fs *mockfs) ResizeFS(ctx context.Context, volumePath, devicePath, ppathDevice, mpathDevice, fsType string) error {
+	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
-func (fs *mockfs) resizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error {
+func (fs *mockfs) resizeFS(ctx context.Context, volumePath, devicePath, ppathDevice, mpathDevice, fsType string) error {
 	if GOFSMock.InduceResizeFSError {
 		return errors.New("resizeFS induced error:	Failed to resize device")
 	}
@@ -202,6 +202,7 @@ func (fs *mockfs) resizeMultipath(ctx context.Context, deviceName string) error 
 	}
 	return nil
 }
+
 func (fs *mockfs) getMounts(ctx context.Context) ([]Info, error) {
 	if GOFSMock.InduceGetMountsError {
 		return GOFSMockMounts, errors.New("getMounts induced error")
