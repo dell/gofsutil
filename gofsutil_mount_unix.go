@@ -101,7 +101,7 @@ func (fs *FS) doMount(
 	if err != nil {
 		out := string(buf)
 		//check is explicitly placed for PowerScale driver only
-		if !(strings.Contains(args, "/ifs") && (strings.Contains(out, "access denied by server while mounting") || strings.Contains(out, "No such file or directory"))) {
+		if !(strings.Contains(args, "/ifs") && (strings.Contains(strings.ToLower(out), "access denied by server while mounting") || strings.Contains(strings.ToLower(out), "no such file or directory"))) {
 			log.WithFields(f).WithField("output", out).WithError(
 				err).Error("mount Failed")
 		}
