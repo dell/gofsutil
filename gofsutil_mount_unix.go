@@ -100,8 +100,11 @@ func (fs *FS) doMount(
 	buf, err := exec.Command(mntCmd, mountArgs...).CombinedOutput()
 	if err != nil {
 		out := string(buf)
-		log.WithFields(f).WithField("output", out).WithError(
-			err).Error("mount Failed")
+		//check is explicitly placed for PowerScale driver only
+		if !(strings.Contains(args, "/ifs") && (strings.Contains(strings.ToLower(out), "access denied by server while mounting") || strings.Contains(strings.ToLower(out), "no such file or directory"))) {
+			log.WithFields(f).WithField("output", out).WithError(
+				err).Error("mount Failed")
+		}
 		return fmt.Errorf(
 			"mount failed: %v\nmounting arguments: %s\noutput: %s",
 			err, args, out)
