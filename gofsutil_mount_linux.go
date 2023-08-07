@@ -291,7 +291,7 @@ func (fs *FS) bindMount(
 	return fs.doMount(ctx, "mount", source, target, "", opts...)
 }
 
-//isLsblkNew returns true if lsblk version is greater than 2.3 and false otherwise
+// isLsblkNew returns true if lsblk version is greater than 2.3 and false otherwise
 func (fs *FS) isLsblkNew() (bool, error) {
 	lsblkNew := false
 	checkVersCmd := "lsblk -V"
@@ -498,7 +498,7 @@ func (fs *FS) getMountInfoFromDevice(
 	return mountInfo, nil
 }
 
-//FindFSType fetches the filesystem type on mountpoint
+// FindFSType fetches the filesystem type on mountpoint
 func (fs *FS) findFSType(
 	ctx context.Context, mountpoint string) (fsType string, err error) {
 	path := filepath.Clean(mountpoint)
@@ -616,7 +616,7 @@ func (fs *FS) expandXfs(volumePath string) error {
 	return nil
 }
 
-//DeviceRescan rescan the device for size alterations
+// DeviceRescan rescan the device for size alterations
 func (fs *FS) deviceRescan(ctx context.Context,
 	devicePath string) error {
 	path := filepath.Clean(devicePath)

@@ -86,17 +86,17 @@ func (fs *FS) Unmount(ctx context.Context, target string) error {
 	return fs.unmount(ctx, target)
 }
 
-//GetMountInfoFromDevice retrieves mount information associated with the volume
+// GetMountInfoFromDevice retrieves mount information associated with the volume
 func (fs *FS) GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
 	return fs.getMountInfoFromDevice(ctx, devID)
 }
 
-//GetMpathNameFromDevice retrieves mpath device name from device name
+// GetMpathNameFromDevice retrieves mpath device name from device name
 func (fs *FS) GetMpathNameFromDevice(ctx context.Context, device string) (string, error) {
 	return fs.getMpathNameFromDevice(ctx, device)
 }
 
-//ResizeFS expands the filesystem to the new size of underlying device
+// ResizeFS expands the filesystem to the new size of underlying device
 func (fs *FS) ResizeFS(
 	ctx context.Context,
 	volumePath, devicePath, ppathDevice,
@@ -104,18 +104,18 @@ func (fs *FS) ResizeFS(
 	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
-//FindFSType fetches the filesystem type on mountpoint
+// FindFSType fetches the filesystem type on mountpoint
 func (fs *FS) FindFSType(
 	ctx context.Context, mountpoint string) (fsType string, err error) {
 	return fs.findFSType(ctx, mountpoint)
 }
 
-//ResizeMultipath resizes the multipath devices mounted on FS
+// ResizeMultipath resizes the multipath devices mounted on FS
 func (fs *FS) ResizeMultipath(ctx context.Context, deviceName string) error {
 	return fs.resizeMultipath(ctx, deviceName)
 }
 
-//DeviceRescan rescan the device for size alterations
+// DeviceRescan rescan the device for size alterations
 func (fs *FS) DeviceRescan(ctx context.Context,
 	devicePath string) error {
 	return fs.deviceRescan(ctx, devicePath)
