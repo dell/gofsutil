@@ -36,18 +36,18 @@ function. If the situation should ever change such that mount options
 number in the thousands then this function should defer to
 RemoveDuplicatesLinearOrdered instead of RemoveDuplicatesExponentialOrdered.
 
-        $ go test -run Bench -bench BenchmarkRemoveDuplicates -benchmem -v
-        goos: darwin
-        goarch: amd64
-        pkg: github.com/thecodeteam/gofsutil
-        BenchmarkRemoveDuplicates_Exponential_Ordered___SmallData-8   	20000000	       121 ns/op	       0 B/op	       0 allocs/op
-        BenchmarkRemoveDuplicates_Exponential_Unordered_SmallData-8   	20000000	        99.0 ns/op	       0 B/op	       0 allocs/op
-        BenchmarkRemoveDuplicates_Linear______Ordered___SmallData-8   	 2000000	       715 ns/op	     288 B/op	       1 allocs/op
-        BenchmarkRemoveDuplicates_Exponential_Ordered___BigData-8     	   20000	     84731 ns/op	       0 B/op	       0 allocs/op
-        BenchmarkRemoveDuplicates_Exponential_Unordered_BigData-8     	   10000	    156660 ns/op	       0 B/op	       0 allocs/op
-        BenchmarkRemoveDuplicates_Linear______Ordered___BigData-8     	   50000	     36971 ns/op	   20512 B/op	       2 allocs/op
-        PASS
-        ok  	github.com/thecodeteam/gofsutil	22.085s
+	$ go test -run Bench -bench BenchmarkRemoveDuplicates -benchmem -v
+	goos: darwin
+	goarch: amd64
+	pkg: github.com/thecodeteam/gofsutil
+	BenchmarkRemoveDuplicates_Exponential_Ordered___SmallData-8   	20000000	       121 ns/op	       0 B/op	       0 allocs/op
+	BenchmarkRemoveDuplicates_Exponential_Unordered_SmallData-8   	20000000	        99.0 ns/op	       0 B/op	       0 allocs/op
+	BenchmarkRemoveDuplicates_Linear______Ordered___SmallData-8   	 2000000	       715 ns/op	     288 B/op	       1 allocs/op
+	BenchmarkRemoveDuplicates_Exponential_Ordered___BigData-8     	   20000	     84731 ns/op	       0 B/op	       0 allocs/op
+	BenchmarkRemoveDuplicates_Exponential_Unordered_BigData-8     	   10000	    156660 ns/op	       0 B/op	       0 allocs/op
+	BenchmarkRemoveDuplicates_Linear______Ordered___BigData-8     	   50000	     36971 ns/op	   20512 B/op	       2 allocs/op
+	PASS
+	ok  	github.com/thecodeteam/gofsutil	22.085s
 */
 func RemoveDuplicates(a []string) []string {
 	return RemoveDuplicatesExponentialOrdered(a)
