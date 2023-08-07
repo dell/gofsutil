@@ -157,17 +157,17 @@ func Unmount(ctx context.Context, target string) error {
 	return fs.Unmount(ctx, target)
 }
 
-//GetMountInfoFromDevice retrieves mount information associated with the volume
+// GetMountInfoFromDevice retrieves mount information associated with the volume
 func GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
 	return fs.GetMountInfoFromDevice(ctx, devID)
 }
 
-//GetMpathNameFromDevice retrieves mpath device name from device name
+// GetMpathNameFromDevice retrieves mpath device name from device name
 func GetMpathNameFromDevice(ctx context.Context, device string) (string, error) {
 	return fs.getMpathNameFromDevice(ctx, device)
 }
 
-//ResizeFS expands the filesystem to the new size of underlying device
+// ResizeFS expands the filesystem to the new size of underlying device
 func ResizeFS(
 	ctx context.Context,
 	volumePath, devicePath, ppathDevice,
@@ -175,18 +175,18 @@ func ResizeFS(
 	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
-//ResizeMultipath expands the multipath volumes
+// ResizeMultipath expands the multipath volumes
 func ResizeMultipath(ctx context.Context, deviceName string) error {
 	return fs.resizeMultipath(ctx, deviceName)
 }
 
-//FindFSType fetches the filesystem type on mountpoint
+// FindFSType fetches the filesystem type on mountpoint
 func FindFSType(
 	ctx context.Context, mountpoint string) (fsType string, err error) {
 	return fs.findFSType(ctx, mountpoint)
 }
 
-//DeviceRescan rescan the device for size alterations
+// DeviceRescan rescan the device for size alterations
 func DeviceRescan(ctx context.Context,
 	devicePath string) error {
 	return fs.deviceRescan(ctx, devicePath)
@@ -196,15 +196,15 @@ func DeviceRescan(ctx context.Context,
 //
 // * Linux hosts use mount_namespaces to obtain mount information.
 //
-//   Support for mount_namespaces was introduced to the Linux kernel
-//   in 2.2.26 (http://man7.org/linux/man-pages/man5/proc.5.html) on
-//   2004/02/04.
+//		Support for mount_namespaces was introduced to the Linux kernel
+//		in 2.2.26 (http://man7.org/linux/man-pages/man5/proc.5.html) on
+//		2004/02/04.
 //
-//   The kernel documents the contents of "/proc/<pid>/mountinfo" at
-//   https://www.kernel.org/doc/Documentation/filesystems/proc.txt.
+//		The kernel documents the contents of "/proc/<pid>/mountinfo" at
+//		https://www.kernel.org/doc/Documentation/filesystems/proc.txt.
 //
-// * Darwin hosts parse the output of the "mount" command to obtain
-//   mount information.
+//	  - Darwin hosts parse the output of the "mount" command to obtain
+//	    mount information.
 func GetMounts(ctx context.Context) ([]Info, error) {
 	return fs.GetMounts(ctx)
 }

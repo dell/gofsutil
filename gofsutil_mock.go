@@ -342,15 +342,15 @@ func (fs *mockfs) Unmount(ctx context.Context, target string) error {
 //
 // * Linux hosts use mount_namespaces to obtain mount information.
 //
-//   Support for mount_namespaces was introduced to the Linux kernel
-//   in 2.2.26 (http://man7.org/linux/man-pages/man5/proc.5.html) on
-//   2004/02/04.
+//		Support for mount_namespaces was introduced to the Linux kernel
+//		in 2.2.26 (http://man7.org/linux/man-pages/man5/proc.5.html) on
+//		2004/02/04.
 //
-//   The kernel documents the contents of "/proc/<pid>/mountinfo" at
-//   https://www.kernel.org/doc/Documentation/filesystems/proc.txt.
+//		The kernel documents the contents of "/proc/<pid>/mountinfo" at
+//		https://www.kernel.org/doc/Documentation/filesystems/proc.txt.
 //
-// * Darwin hosts parse the output of the "mount" command to obtain
-//   mount information.
+//	  - Darwin hosts parse the output of the "mount" command to obtain
+//	    mount information.
 func (fs *mockfs) GetMounts(ctx context.Context) ([]Info, error) {
 	return fs.getMounts(ctx)
 }
