@@ -18,7 +18,6 @@ package gofsutil
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -232,7 +231,7 @@ func (fs *FS) wwnToDevicePath(
 func (fs *FS) targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
 	result := make(map[string]string, 0)
 	bypathdir := "/dev/disk/by-path"
-	entries, err := ioutil.ReadDir(bypathdir)
+	entries, err := os.ReadDir(bypathdir)
 	if err != nil {
 		log.Printf("/dev/disk/by-path not found: %s", err.Error())
 		return result, err
@@ -335,7 +334,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 	// Fallback... we didn't find any target devices... so rescan all the hosts
 	// Gather up the host devices.
 	log.Printf("No targeted devices found... rescanning all the hosts")
-	hosts, err := ioutil.ReadDir(hostsdir)
+	hosts, err := os.ReadDir(hostsdir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + hostsdir)
 		return err
@@ -379,7 +378,7 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 	}
 	// Read the directory entries for fc_remote_ports
 	fcRemotePortsDir := "/sys/class/fc_remote_ports"
-	remotePortEntries, err := ioutil.ReadDir(fcRemotePortsDir)
+	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcRemotePortsDir)
 	}
@@ -395,7 +394,7 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 			continue
 		}
 
-		arrayPortNameBytes, err := ioutil.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
+		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
 		if err != nil {
 			continue
 		}
@@ -434,7 +433,7 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 	}
 	// Read the sessions.
 	sessionsdir := "/sys/class/iscsi_session"
-	sessions, err := ioutil.ReadDir(sessionsdir)
+	sessions, err := os.ReadDir(sessionsdir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
 		return targetDev, err
@@ -446,7 +445,7 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 		}
 		log.Debug("Processing iscsi_session: " + session.Name())
 		if len(targets) > 0 {
-			targetBytes, err := ioutil.ReadFile(sessionsdir + "/" + session.Name() + "/" + "targetname")
+			targetBytes, err := os.ReadFile(sessionsdir + "/" + session.Name() + "/" + "targetname")
 			if err != nil {
 				continue
 			}
@@ -463,7 +462,7 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 		}
 		// Read device/target entry to get the data for rescan.
 		devicedir := sessionsdir + "/" + session.Name() + "/" + "device"
-		devices, err := ioutil.ReadDir(devicedir)
+		devices, err := os.ReadDir(devicedir)
 		if err != nil {
 			log.WithField("error", err).Error("Cannot read directory: " + devicedir)
 			continue
@@ -514,7 +513,7 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 	if len(devicePathComponents) > 1 {
 		deviceName := devicePathComponents[len(devicePathComponents)-1]
 		statePath := fmt.Sprintf("/sys/block/%s/device/state", deviceName)
-		stateBytes, err := ioutil.ReadFile(filepath.Clean(statePath))
+		stateBytes, err := os.ReadFile(filepath.Clean(statePath))
 		if err != nil {
 			return fmt.Errorf("Cannot read %s: %s", statePath, err)
 		}
@@ -583,7 +582,7 @@ func (fs *FS) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
 	portWWNs := make([]string, 0)
 	// Read the directory entries for fc_remote_ports
 	fcHostsDir := "/sys/class/fc_host"
-	hostEntries, err := ioutil.ReadDir(fcHostsDir)
+	hostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
 		return portWWNs, err
@@ -595,7 +594,7 @@ func (fs *FS) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		hostPortNameBytes, err := ioutil.ReadFile(fcHostsDir + "/" + host.Name() + "/" + "port_name")
+		hostPortNameBytes, err := os.ReadFile(fcHostsDir + "/" + host.Name() + "/" + "port_name")
 		if err != nil {
 			continue
 		}
@@ -610,7 +609,7 @@ func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
 	var savedError error
 	// Read the directory entries for fc_remote_ports
 	fcHostsDir := "/sys/class/fc_host"
-	fcHostEntries, err := ioutil.ReadDir(fcHostsDir)
+	fcHostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
 	}
@@ -646,7 +645,7 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN stri
 	start := time.Now()
 	result := make([]string, 0)
 	sysBlockDir := "/sys/block"
-	sysBlocks, err := ioutil.ReadDir(sysBlockDir)
+	sysBlocks, err := os.ReadDir(sysBlockDir)
 	if err != nil {
 		return result, fmt.Errorf("Error reading %s: %s", sysBlockDir, err)
 	}
@@ -656,7 +655,7 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN stri
 			continue
 		}
 		wwidPath := sysBlockDir + "/" + name + "/device/wwid"
-		bytes, err := ioutil.ReadFile(filepath.Clean(wwidPath))
+		bytes, err := os.ReadFile(filepath.Clean(wwidPath))
 		if err != nil {
 			continue
 		}

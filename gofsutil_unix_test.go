@@ -18,7 +18,6 @@ package gofsutil_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -30,7 +29,7 @@ func TestFCRescanSCSIHost(t *testing.T) {
 	var targets []string
 	// Scan the remote ports to find the array port WWNs
 	fcRemotePortsDir := "/sys/class/fc_remote_ports"
-	remotePortEntries, err := ioutil.ReadDir(fcRemotePortsDir)
+	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
 	if err != nil {
 		t.Errorf("error reading %s: %s", fcRemotePortsDir, err)
 	}
@@ -43,7 +42,7 @@ func TestFCRescanSCSIHost(t *testing.T) {
 			continue
 		}
 
-		arrayPortNameBytes, err := ioutil.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
+		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
 		if err != nil {
 			continue
 		}

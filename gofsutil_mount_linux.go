@@ -16,7 +16,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -639,12 +638,12 @@ func (fs *FS) deviceRescan(ctx context.Context,
 }
 
 func (fs *FS) consistentRead(filename string, retry int) ([]byte, error) {
-	oldContent, err := ioutil.ReadFile(filepath.Clean(filename))
+	oldContent, err := os.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}
 	for i := 0; i < retry; i++ {
-		newContent, err := ioutil.ReadFile(filepath.Clean(filename))
+		newContent, err := os.ReadFile(filepath.Clean(filename))
 		if err != nil {
 			return nil, err
 		}
