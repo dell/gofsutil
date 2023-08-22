@@ -14,7 +14,6 @@ package gofsutil_test
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -22,11 +21,11 @@ import (
 )
 
 func TestBindMount(t *testing.T) {
-	src, err := ioutil.TempDir("", "")
+	src, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	tgt, err := ioutil.TempDir("", "")
+	tgt, err := os.MkdirTemp("", "")
 	if err != nil {
 		os.RemoveAll(src)
 		t.Fatal(err)
