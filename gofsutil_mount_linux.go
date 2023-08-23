@@ -459,12 +459,18 @@ func (fs *FS) getMountInfoFromDevice(
 	deviceTypeRegx := regexp.MustCompile(`TYPE=\"mpath"`)
 	deviceNameRegx := regexp.MustCompile(`NAME=\"\S+\"`)
 	mountPoint := mountRegx.FindString(output)
+	if(len(mountPoint) == 0){
+		mountsRegx := regexp.MustCompile(`MOUNTPOINTS=\"\S+\"`)
+		mountPoint = mountsRegx.FindString(output)
+	}
 	devices := sdDeviceRegx.FindAllString(output, 99999)
 	nvmeDevices := nvmeDeviceRegx.FindAllString(output, 99999)
 	mpath := mpathDeviceRegx.FindString(output)
 	ppath := ppathDeviceRegx.FindString(output)
 	mountInfo := new(DeviceMountInfo)
-	mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
+	if(len(mountPoint) == 0){
+		mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
+	}
 	for _, device := range devices {
 		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
 	}
