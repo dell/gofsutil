@@ -468,7 +468,7 @@ func (fs *FS) getMountInfoFromDevice(
 	mpath := mpathDeviceRegx.FindString(output)
 	ppath := ppathDeviceRegx.FindString(output)
 	mountInfo := new(DeviceMountInfo)
-	if(len(mountPoint) == 0){
+	if(len(mountPoint) != 0){
 		mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
 	}
 	for _, device := range devices {
