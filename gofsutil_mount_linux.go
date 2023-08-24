@@ -430,7 +430,7 @@ func (fs *FS) getMountInfoFromDevice(
 		log.Debugf("multipath exec command output is : %+v", output)
 		if output != "" {
 			if lsblkNew {
-				cmd = "lsblk -Px MODE | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+				cmd = "lsblk --pairs --sort MODE --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
 			} else {
 				cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
 			}
@@ -459,18 +459,12 @@ func (fs *FS) getMountInfoFromDevice(
 	deviceTypeRegx := regexp.MustCompile(`TYPE=\"mpath"`)
 	deviceNameRegx := regexp.MustCompile(`NAME=\"\S+\"`)
 	mountPoint := mountRegx.FindString(output)
-	if(len(mountPoint) == 0){
-		mountsRegx := regexp.MustCompile(`MOUNTPOINTS=\"\S+\"`)
-		mountPoint = mountsRegx.FindString(output)
-	}
 	devices := sdDeviceRegx.FindAllString(output, 99999)
 	nvmeDevices := nvmeDeviceRegx.FindAllString(output, 99999)
 	mpath := mpathDeviceRegx.FindString(output)
 	ppath := ppathDeviceRegx.FindString(output)
 	mountInfo := new(DeviceMountInfo)
-	if(len(mountPoint) != 0){
-		mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
-	}
+	mountInfo.MountPoint = strings.Split(mountPoint, "\"")[1]
 	for _, device := range devices {
 		mountInfo.DeviceNames = append(mountInfo.DeviceNames, strings.Split(device, "\"")[1])
 	}
