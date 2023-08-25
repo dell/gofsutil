@@ -406,7 +406,7 @@ func (fs *FS) getMountInfoFromDevice(
 	}
 	//check if devID has powerpath devices
 	/* #nosec G204 */
-	checkCmd := "lsblk -P | awk '/emcpower.+" + devID + "/ {print $0}'"
+	checkCmd := "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/emcpower.+" + devID + "/ {print $0}'"
 	log.Debugf("ppath checkcommand values is %s", checkCmd)
 	/* #nosec G204 */
 	buf, err := exec.Command("bash", "-c", checkCmd).Output()
@@ -418,7 +418,7 @@ func (fs *FS) getMountInfoFromDevice(
 		// output is nil, powerpath device not found, continuing for multipath or single device
 		log.Info("powerpath command output is nil, continuing for multipath or single device")
 		/* #nosec G204 */
-		checkCmd = "lsblk -P | awk '/mpath.+" + devID + "/ {print $0}'"
+		checkCmd = "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/mpath.+" + devID + "/ {print $0}'"
 		log.Debugf("mpath checkcommand values is %s", checkCmd)
 
 		/* #nosec G204 */
@@ -432,12 +432,12 @@ func (fs *FS) getMountInfoFromDevice(
 			if lsblkNew {
 				cmd = "lsblk --pairs --sort MODE --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
 			} else {
-				cmd = "lsblk -P | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+				cmd = "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
 			}
 		} else {
 			// multipath device not found, continue as single device
 			/* #nosec G204 */
-			cmd = "lsblk -P | awk '/" + devID + "/ {print $0}'"
+			cmd = "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/ {print $0}'"
 		}
 		log.Debugf("command value is %s", cmd)
 		/* #nosec G204 */
