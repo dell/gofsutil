@@ -359,7 +359,7 @@ func (fs *FS) getNativeDevicesFromPpath(
 	args := []string{"-wwn", "-dev", deviceName}
 	out, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		log.Errorf("Error powermt display %s: %v", deviceName, err)
+		log.Errorf("Error pp_inq display %s: %v", deviceName, err.Error())
 		return devices, err
 	}
 	op := strings.Split(string(out), "\n")
