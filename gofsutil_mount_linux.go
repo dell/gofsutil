@@ -377,8 +377,16 @@ func (fs *FS) getNativeDevicesFromPpath(
 		log.Errorf("Error ls display: %v", err.Error())
 		return devices, err
 	}
+	// cp
+	args = []string{"/noderoot/usr/lib64/libcrypt.so.1 lib64/"}
+	out, err = exec.Command("cp", args...).CombinedOutput()
+	if err != nil {
+		log.Errorf("Error cp cmd: %v", err.Error())
+		return devices, err
+	}
 	op = strings.Split(string(out), "\n")
 	log.Debugf("ls OP: %s", op)
+
 	deviceName := fmt.Sprintf("/dev/%s", ppath)
 	cmd := fmt.Sprintf("chroot %s %s", "/noderoot", ppinqtool)
 	log.Debug("pp_inq cmd:", cmd)
