@@ -363,13 +363,13 @@ func (fs *FS) getNativeDevicesFromPpath(
 	op := strings.Split(string(out), "\n")
 	log.Debugf("echo OP: %s", op)
 	// check the working directory
-	out, err = exec.Command("pwd").CombinedOutput()
+	out, err = exec.Command("whoami").CombinedOutput()
 	if err != nil {
 		log.Errorf("Error pwd display: %v", err.Error())
 		return devices, err
 	}
 	op = strings.Split(string(out), "\n")
-	log.Debugf("PATH OP: %s", op)
+	log.Debugf("whoami: %s", op)
 	// chech the noderoot/sbin/dir
 	args = []string{"/noderoot/sbin/"}
 	out, err = exec.Command("ls", args...).CombinedOutput()
