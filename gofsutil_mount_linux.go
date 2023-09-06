@@ -380,7 +380,7 @@ func (fs *FS) getNativeDevicesFromPpath(
 	op = strings.Split(string(out), "\n")
 	log.Debugf("ls OP: %s", op)
 	// cp
-	cpCmd := fmt.Sprintf("cp /%s/%s/ %s", "noderoot", "lib64", "libcrypt.so.1", "lib64/")
+	cpCmd := fmt.Sprintf("cp /%s/%s/%s %s", "noderoot", "lib64", "libcrypt.so.1", "lib64/")
 	log.Debug("cp cmd:", cpCmd)
 	out, err = exec.Command("cp").CombinedOutput()
 	if err != nil {
