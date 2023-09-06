@@ -354,7 +354,7 @@ func (fs *FS) getNativeDevicesFromPpath(
 	var deviceWWN string
 
 	deviceName := fmt.Sprintf("/dev/%s", ppath)
-	cmd := fmt.Sprintf("chroot %s /%s", "/noderoot", ppinqtool)
+	cmd := fmt.Sprintf("chroot %s %s", "/noderoot", ppinqtool)
 	log.Debug("pp_inq cmd:", cmd)
 	args := []string{"-wwn", "-dev", deviceName}
 	out, err := exec.Command(cmd, args...).CombinedOutput()
