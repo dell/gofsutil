@@ -353,16 +353,42 @@ func (fs *FS) getNativeDevicesFromPpath(
 	var devices []string
 	var deviceWWN string
 
+	// check the PATH
+	args := []string{"$PATH"}
+	out, err := exec.Command("echo", args...).CombinedOutput()
+	if err != nil {
+		log.Errorf("Error echo display %v", err.Error())
+		return devices, err
+	}
+	op := strings.Split(string(out), "\n")
+	log.Debugf("echo OP: %s", op)
+	// check the working directory
+	out, err = exec.Command("pwd").CombinedOutput()
+	if err != nil {
+		log.Errorf("Error pwd display: %v", err.Error())
+		return devices, err
+	}
+	op = strings.Split(string(out), "\n")
+	log.Debugf("PATH OP: %s", op)
+	// chech the noderoot/sbin/dir
+	args = []string{"/noderoot/sbin/"}
+	out, err = exec.Command("ls", args...).CombinedOutput()
+	if err != nil {
+		log.Errorf("Error ls display: %v", err.Error())
+		return devices, err
+	}
+	op = strings.Split(string(out), "\n")
+	log.Debugf("ls OP: %s", op)
 	deviceName := fmt.Sprintf("/dev/%s", ppath)
 	cmd := fmt.Sprintf("chroot %s %s", "/noderoot", ppinqtool)
 	log.Debug("pp_inq cmd:", cmd)
-	args := []string{"-wwn", "-dev", deviceName}
-	out, err := exec.Command(cmd, args...).CombinedOutput()
+	args = []string{"-wwn", "-dev", deviceName}
+	out, err = exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
 		log.Errorf("Error pp_inq display %s: %v", deviceName, err.Error())
 		return devices, err
 	}
-	op := strings.Split(string(out), "\n")
+	op = strings.Split(string(out), "\n")
 	fmt.Printf("pp_inq output for %s %+v \n", ppath, op)
 	/*  Output for pp_inq -wwn -dev /dev/ppath
 	L#1 Inquiry utility, Version V9.2-2602 (Rev 0.0)
