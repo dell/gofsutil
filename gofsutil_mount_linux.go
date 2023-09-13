@@ -575,6 +575,7 @@ func reReadPartitionTable(ctx context.Context, devicePath string) error {
 	if err := validatePath(path); err != nil {
 		return fmt.Errorf("Failed to validate path: %s error %v", devicePath, err)
 	}
+	args := []string{path}
 	_, err := exec.Command("partprobe", args...).CombinedOutput()
 	if err != nil {
 		log.Errorf("Failed to execute partprobe on %s: %s", devicePath, err.Error())
