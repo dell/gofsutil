@@ -122,10 +122,10 @@ func DefaultEntryScanFunc() EntryScanFunc {
 }
 
 func defaultEntryScanFunc(
-	ctx context.Context,
+	_ context.Context,
 	entry Entry,
-	cache map[string]Entry) (info Info, valid bool, failed error) {
-
+	cache map[string]Entry,
+) (info Info, valid bool, failed error) {
 	// Validate the mount table entry.
 	validFSType, _ := regexp.MatchString(
 		`(?i)^devtmpfs|(?:fuse\..*)|(?:nfs\d?)$`, entry.FSType)
@@ -196,10 +196,10 @@ unbindable  mount is unbindable
 func ReadProcMountsFrom(
 	ctx context.Context,
 	file io.Reader,
-	quick bool,
+	_ bool,
 	expectedFields int,
-	scanEntry EntryScanFunc) ([]Info, uint32, error) {
-
+	scanEntry EntryScanFunc,
+) ([]Info, uint32, error) {
 	if scanEntry == nil {
 		scanEntry = defaultEntryScanFunc
 	}
@@ -266,10 +266,10 @@ func ReadProcMountsFrom(
 //
 //	mount [-t $fsType] [-o $options] [$source] $target
 func MakeMountArgs(
-	ctx context.Context,
+	_ context.Context,
 	source, target, fsType string,
-	opts ...string) []string {
-
+	opts ...string,
+) []string {
 	args := []string{}
 	if len(fsType) > 0 {
 		args = append(args, "-t", fsType)

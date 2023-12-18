@@ -74,7 +74,7 @@ type mockfs struct {
 	ScanEntry EntryScanFunc
 }
 
-func (fs *mockfs) getDiskFormat(ctx context.Context, disk string) (string, error) {
+func (fs *mockfs) getDiskFormat(_ context.Context, disk string) (string, error) {
 	if GOFSMock.InduceGetDiskFormatError {
 		GOFSMock.InduceMountError = false
 		return "", errors.New("getDiskFormat induced error")
@@ -91,7 +91,7 @@ func (fs *mockfs) getDiskFormat(ctx context.Context, disk string) (string, error
 	return "", nil
 }
 
-func (fs *mockfs) formatAndMount(ctx context.Context, source, target, fsType string, opts ...string) error {
+func (fs *mockfs) formatAndMount(_ context.Context, source, target, fsType string, opts ...string) error {
 	if GOFSMock.InduceBindMountError {
 		GOFSMock.InduceMountError = false
 		return errors.New("bindMount induced error")
@@ -105,7 +105,7 @@ func (fs *mockfs) formatAndMount(ctx context.Context, source, target, fsType str
 	return nil
 }
 
-func (fs *mockfs) format(ctx context.Context, source, target, fsType string, opts ...string) error {
+func (fs *mockfs) format(_ context.Context, source, target, fsType string, opts ...string) error {
 	if GOFSMock.InduceFormatError {
 		return errors.New("format induced error")
 	}
@@ -118,7 +118,7 @@ func (fs *mockfs) format(ctx context.Context, source, target, fsType string, opt
 	return nil
 }
 
-func (fs *mockfs) bindMount(ctx context.Context, source, target string, opts ...string) error {
+func (fs *mockfs) bindMount(_ context.Context, source, target string, opts ...string) error {
 	if GOFSMock.InduceBindMountError {
 		return errors.New("bindMount induced error")
 	}
@@ -135,7 +135,7 @@ func (fs *mockfs) DeviceRescan(ctx context.Context, devicePath string) error {
 	return fs.deviceRescan(ctx, devicePath)
 }
 
-func (fs *mockfs) deviceRescan(ctx context.Context, devicePath string) error {
+func (fs *mockfs) deviceRescan(_ context.Context, _ string) error {
 	if GOFSMock.InduceDeviceRescanError {
 		return errors.New("DeviceRescan induced error: Failed to rescan device")
 	}
@@ -146,7 +146,7 @@ func (fs *mockfs) ResizeFS(ctx context.Context, volumePath, devicePath, ppathDev
 	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
-func (fs *mockfs) resizeFS(ctx context.Context, volumePath, devicePath, ppathDevice, mpathDevice, fsType string) error {
+func (fs *mockfs) resizeFS(_ context.Context, _, _, _, _, _ string) error {
 	if GOFSMock.InduceResizeFSError {
 		return errors.New("resizeFS induced error:	Failed to resize device")
 	}
@@ -157,7 +157,7 @@ func (fs *mockfs) FindFSType(ctx context.Context, mountpoint string) (fsType str
 	return fs.findFSType(ctx, mountpoint)
 }
 
-func (fs *mockfs) findFSType(ctx context.Context, mountpoint string) (fsType string, err error) {
+func (fs *mockfs) findFSType(_ context.Context, _ string) (fsType string, err error) {
 	if GOFSMock.InduceFSTypeError {
 		return "", errors.New("getMounts induced error: Failed to fetch filesystem as no mount info")
 	}
@@ -168,7 +168,7 @@ func (fs *mockfs) GetMountInfoFromDevice(ctx context.Context, devID string) (*De
 	return fs.getMountInfoFromDevice(ctx, devID)
 }
 
-func (fs *mockfs) getMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
+func (fs *mockfs) getMountInfoFromDevice(_ context.Context, _ string) (*DeviceMountInfo, error) {
 	if GOFSMock.InduceGetMountInfoFromDeviceError {
 		return GOFSMockMountInfo, errors.New("getMounts induced error: Failed to find mount information")
 	}
@@ -185,7 +185,7 @@ func (fs *mockfs) GetMpathNameFromDevice(ctx context.Context, devID string) (str
 	return fs.getMpathNameFromDevice(ctx, devID)
 }
 
-func (fs *mockfs) getMpathNameFromDevice(ctx context.Context, devID string) (string, error) {
+func (fs *mockfs) getMpathNameFromDevice(_ context.Context, _ string) (string, error) {
 	if GOFSMock.InduceGetMpathNameFromDeviceError {
 		return "", errors.New("getMpathNameFromDevice induced error: Failed to find mount information")
 	}
@@ -197,7 +197,7 @@ func (fs *mockfs) FsInfo(ctx context.Context, path string) (int64, int64, int64,
 	return fs.fsInfo(ctx, path)
 }
 
-func (fs *mockfs) fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+func (fs *mockfs) fsInfo(_ context.Context, _ string) (int64, int64, int64, int64, int64, int64, error) {
 	if GOFSMock.InduceFilesystemInfoError {
 		return 0, 0, 0, 0, 0, 0, errors.New("filesystemInfo induced error: Failed to get fileystem stats")
 	}
@@ -208,27 +208,28 @@ func (fs *mockfs) ResizeMultipath(ctx context.Context, deviceName string) error 
 	return fs.resizeMultipath(ctx, deviceName)
 }
 
-func (fs *mockfs) resizeMultipath(ctx context.Context, deviceName string) error {
+func (fs *mockfs) resizeMultipath(_ context.Context, _ string) error {
 	if GOFSMock.InduceResizeMultipathError {
 		return errors.New("resize multipath induced error: Failed to resize multipath mount device")
 	}
 	return nil
 }
 
-func (fs *mockfs) getMounts(ctx context.Context) ([]Info, error) {
+func (fs *mockfs) getMounts(_ context.Context) ([]Info, error) {
 	if GOFSMock.InduceGetMountsError {
 		return GOFSMockMounts, errors.New("getMounts induced error")
 	}
 	return GOFSMockMounts, nil
 }
 
-func (fs *mockfs) readProcMounts(ctx context.Context,
-	path string,
-	info bool) ([]Info, uint32, error) {
+func (fs *mockfs) readProcMounts(_ context.Context,
+	_ string,
+	_ bool,
+) ([]Info, uint32, error) {
 	return nil, 0, errors.New("not implemented")
 }
 
-func (fs *mockfs) mount(ctx context.Context, source, target, fsType string, opts ...string) error {
+func (fs *mockfs) mount(_ context.Context, source, target, fsType string, opts ...string) error {
 	if GOFSMock.InduceMountError {
 		return errors.New("mount induced error")
 	}
@@ -250,7 +251,7 @@ func (fs *mockfs) mount(ctx context.Context, source, target, fsType string, opts
 	return nil
 }
 
-func (fs *mockfs) unmount(ctx context.Context, target string) error {
+func (fs *mockfs) unmount(_ context.Context, target string) error {
 	if GOFSMock.InduceUnmountError {
 		return errors.New("unmount induced error")
 	}
@@ -263,7 +264,7 @@ func (fs *mockfs) unmount(ctx context.Context, target string) error {
 	return nil
 }
 
-func (fs *mockfs) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
+func (fs *mockfs) getDevMounts(_ context.Context, _ string) ([]Info, error) {
 	if GOFSMock.InduceDevMountsError {
 		return GOFSMockMounts, errors.New("dev mount induced error")
 	}
@@ -271,7 +272,8 @@ func (fs *mockfs) getDevMounts(ctx context.Context, dev string) ([]Info, error) 
 }
 
 func (fs *mockfs) validateDevice(
-	ctx context.Context, source string) (string, error) {
+	_ context.Context, _ string,
+) (string, error) {
 	return "", errors.New("not implemented")
 }
 
@@ -287,8 +289,8 @@ func (fs *mockfs) GetDiskFormat(ctx context.Context, disk string) (string, error
 func (fs *mockfs) FormatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	return fs.formatAndMount(ctx, source, target, fsType, options...)
 }
 
@@ -296,8 +298,8 @@ func (fs *mockfs) FormatAndMount(
 func (fs *mockfs) Format(
 	ctx context.Context,
 	source, target, fsType string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	return fs.format(ctx, source, target, fsType, options...)
 }
 
@@ -313,8 +315,8 @@ func (fs *mockfs) Format(
 func (fs *mockfs) Mount(
 	ctx context.Context,
 	source, target, fsType string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	return fs.mount(ctx, source, target, fsType, options...)
 }
 
@@ -323,8 +325,8 @@ func (fs *mockfs) Mount(
 func (fs *mockfs) BindMount(
 	ctx context.Context,
 	source, target string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	if options == nil {
 		options = []string{"bind"}
 	} else {
@@ -365,14 +367,15 @@ func (fs *mockfs) GetDevMounts(ctx context.Context, dev string) ([]Info, error) 
 // evaluated and returned as an absolute path without any symlinks.
 // Otherwise an empty string is returned.
 func (fs *mockfs) ValidateDevice(
-	ctx context.Context, source string) (string, error) {
-
+	ctx context.Context, source string,
+) (string, error) {
 	return fs.validateDevice(ctx, source)
 }
 
 // wwnToDevicePath lookups a mock WWN (no prefix) to a device path.
 func (fs *mockfs) wwnToDevicePath(
-	ctx context.Context, wwn string) (string, string, error) {
+	_ context.Context, wwn string,
+) (string, string, error) {
 	if GOFSMockWWNToDevice == nil {
 		GOFSMockWWNToDevice = make(map[string]string)
 	}
@@ -384,7 +387,8 @@ func (fs *mockfs) wwnToDevicePath(
 }
 
 func (fs *mockfs) WWNToDevicePath(
-	ctx context.Context, wwn string) (string, string, error) {
+	ctx context.Context, wwn string,
+) (string, string, error) {
 	return fs.wwnToDevicePath(ctx, wwn)
 }
 
@@ -407,7 +411,7 @@ func (fs *mockfs) MultipathCommand(ctx context.Context, timeoutSeconds time.Dura
 // If targets are specified, only hosts who are related to the specified
 // iqn target(s) are rescanned.
 // If lun is specified, then the rescan is for that particular volume.
-func (fs *mockfs) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+func (fs *mockfs) rescanSCSIHost(_ context.Context, _ []string, lun string) error {
 	if GOFSMock.InduceRescanError {
 		return errors.New("induced rescan error")
 	}
@@ -431,7 +435,7 @@ func (fs *mockfs) RemoveBlockDevice(ctx context.Context, blockDevicePath string)
 // removeBlockDevice removes a block device by getting the device name
 // from the last component of the blockDevicePath and then removing the
 // device by writing '1' to /sys/block{deviceName}/device/delete
-func (fs *mockfs) removeBlockDevice(ctx context.Context, blockDevicePath string) error {
+func (fs *mockfs) removeBlockDevice(_ context.Context, blockDevicePath string) error {
 	fmt.Printf(">>>removeBlockDevice %s %#v", blockDevicePath, GOFSMockWWNToDevice)
 	for key, value := range GOFSMockWWNToDevice {
 		if value == blockDevicePath {
@@ -465,7 +469,7 @@ func getDevice(path string) string {
 // Execute the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
-func (fs *mockfs) multipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+func (fs *mockfs) multipathCommand(_ context.Context, _ time.Duration, _ string, _ ...string) ([]byte, error) {
 	if GOFSMock.InduceMultipathCommandError {
 		return make([]byte, 0), errors.New("multipath command induced error")
 	}
@@ -481,7 +485,7 @@ func (fs *mockfs) TargetIPLUNToDevicePath(ctx context.Context, targetIP string, 
 
 // TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
 // and a LUN id. It returns the entry names in /dev/disk/by-path and their associated device paths, along with error.
-func (fs *mockfs) targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+func (fs *mockfs) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID int) (map[string]string, error) {
 	result := make(map[string]string, 0)
 	key := fmt.Sprintf("ip-%s:-lun-%d", targetIP, lunID)
 	if GOFSMockTargetIPLUNToDevice == nil {
@@ -500,7 +504,7 @@ func (fs *mockfs) GetFCHostPortWWNs(ctx context.Context) ([]string, error) {
 }
 
 // getFCHostPortWWNs returns the port WWN addresses of local FC adapters.
-func (fs *mockfs) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
+func (fs *mockfs) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 	portWWNs := GOFSMockFCHostWWNs
 	if GOFSMock.InduceFCHostWWNsError {
 		return portWWNs, errors.New("induced error")
@@ -514,7 +518,7 @@ func (fs *mockfs) IssueLIPToAllFCHosts(ctx context.Context) error {
 }
 
 // issueLIPToAllFCHosts issues the LIP command to all FC hosts.
-func (fs *mockfs) issueLIPToAllFCHosts(ctx context.Context) error {
+func (fs *mockfs) issueLIPToAllFCHosts(_ context.Context) error {
 	if GOFSMock.InduceIssueLipError {
 		return errors.New("induced error")
 	}
@@ -527,7 +531,7 @@ func (fs *mockfs) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN 
 }
 
 // GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
-func (fs *mockfs) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+func (fs *mockfs) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	result := make([]string, 0)
 	if GOFSMock.InduceGetSysBlockDevicesError {
 		return result, errors.New("induced error")

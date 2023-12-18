@@ -34,13 +34,10 @@ const (
 	ppinqtool         = "pp_inq"
 )
 
-var (
-	bindRemountOpts = []string{"remount"}
-)
+var bindRemountOpts = []string{"remount"}
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
-func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
-
+func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
 	path := filepath.Clean(disk)
 	if err := validatePath(path); err != nil {
 		return "", err
@@ -90,8 +87,8 @@ const RequestID = "RequestID"
 func (fs *FS) formatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	err := fs.validateMountArgs(source, target, fsType, opts...)
 	if err != nil {
 		return err
@@ -222,8 +219,8 @@ func (fs *FS) formatAndMount(
 func (fs *FS) format(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	err := fs.validateMountArgs(source, target, fsType, opts...)
 	if err != nil {
 		return err
@@ -281,8 +278,8 @@ func (fs *FS) format(
 func (fs *FS) bindMount(
 	ctx context.Context,
 	source, target string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	err := fs.doMount(ctx, "mount", source, target, "", "bind")
 	if err != nil {
 		return err
@@ -309,7 +306,7 @@ func (fs *FS) isLsblkNew() (bool, error) {
 	}
 	if s, err := strconv.ParseFloat(subMatchMap["vers"], 64); err == nil {
 		fmt.Println(s)
-		if s > 2.30 { //need to check exact version
+		if s > 2.30 { // need to check exact version
 			lsblkNew = true
 		}
 	}
@@ -317,8 +314,8 @@ func (fs *FS) isLsblkNew() (bool, error) {
 }
 
 func (fs *FS) getMpathNameFromDevice(
-	ctx context.Context, device string) (string, error) {
-
+	_ context.Context, device string,
+) (string, error) {
 	path := filepath.Clean(device)
 	if err := validatePath(path); err != nil {
 		return "", err
@@ -348,7 +345,8 @@ func (fs *FS) getMpathNameFromDevice(
 }
 
 func (fs *FS) getNativeDevicesFromPpath(
-	ctx context.Context, ppath string) ([]string, error) {
+	ctx context.Context, ppath string,
+) ([]string, error) {
 	log.Infof("powerpath - trying to find native devices for ppath: %s", ppath)
 	var devices []string
 	var deviceWWN string
@@ -390,8 +388,8 @@ func (fs *FS) getNativeDevicesFromPpath(
 // getMountInfoFromDevice gets mount info for the given device
 // It first checks the existence of powerpath device, if not then checks for multipath, if not then checks for single device.
 func (fs *FS) getMountInfoFromDevice(
-	ctx context.Context, devID string) (*DeviceMountInfo, error) {
-
+	ctx context.Context, devID string,
+) (*DeviceMountInfo, error) {
 	path := filepath.Clean(devID)
 	if err := validatePath(path); err != nil {
 		return nil, err
@@ -481,8 +479,8 @@ func (fs *FS) getMountInfoFromDevice(
 	} else if mpath != "" {
 		mountInfo.MPathName = strings.Split(mpath, "\"")[1]
 	} else {
-		//In case the mpath device is of the form /dev/mapper/3600601xxxxxxx
-		//we check if TYPE is "mpath" then we pick the first mapper device name from NAME
+		// In case the mpath device is of the form /dev/mapper/3600601xxxxxxx
+		// we check if TYPE is "mpath" then we pick the first mapper device name from NAME
 		for _, deviceInfo := range strings.Split(output, "\n") {
 			deviceType := deviceTypeRegx.FindString(deviceInfo)
 			if deviceType != "" {
@@ -499,7 +497,8 @@ func (fs *FS) getMountInfoFromDevice(
 
 // FindFSType fetches the filesystem type on mountpoint
 func (fs *FS) findFSType(
-	ctx context.Context, mountpoint string) (fsType string, err error) {
+	_ context.Context, mountpoint string,
+) (fsType string, err error) {
 	path := filepath.Clean(mountpoint)
 	if err := validatePath(path); err != nil {
 		return "", fmt.Errorf("Failed to validate path: %s error %v", mountpoint, err)
@@ -515,7 +514,7 @@ func (fs *FS) findFSType(
 	return
 }
 
-func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
+func (fs *FS) resizeMultipath(_ context.Context, deviceName string) error {
 	path := filepath.Clean(deviceName)
 	if err := validatePath(path); err != nil {
 		return fmt.Errorf("Failed to validate path: %s error %v", deviceName, err)
@@ -532,17 +531,16 @@ func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
 	return nil
 }
 
-//resizeFS expands the filesystem to the new size of underlying device
-//For XFS filesystem needs filesystem mount point
-//For EXT4 needs devicepath
-//For EXT3 needs devicepath
-//For multipath device, fs resize needs "/device/mapper/mpathname"
-//For powerpath device, fs resize needs "/dev/emcpowera"
-
+// resizeFS expands the filesystem to the new size of underlying device
+// For XFS filesystem needs filesystem mount point
+// For EXT4 needs devicepath
+// For EXT3 needs devicepath
+// For multipath device, fs resize needs "/device/mapper/mpathname"
+// For powerpath device, fs resize needs "/dev/emcpowera"
 func (fs *FS) resizeFS(
 	ctx context.Context, mountpoint,
-	devicePath, ppathDevice, mpathDevice, fsType string) error {
-
+	devicePath, ppathDevice, mpathDevice, fsType string,
+) error {
 	if ppathDevice != "" {
 		devicePath = "/dev/" + ppathDevice
 		err := reReadPartitionTable(ctx, devicePath)
@@ -570,7 +568,7 @@ func (fs *FS) resizeFS(
 }
 
 // reReadPartitionTable re-read the partition table of the pseudo device.
-func reReadPartitionTable(ctx context.Context, devicePath string) error {
+func reReadPartitionTable(_ context.Context, devicePath string) error {
 	path := filepath.Clean(devicePath)
 	if err := validatePath(path); err != nil {
 		return fmt.Errorf("Failed to validate path: %s error %v", devicePath, err)
@@ -616,8 +614,9 @@ func (fs *FS) expandXfs(volumePath string) error {
 }
 
 // DeviceRescan rescan the device for size alterations
-func (fs *FS) deviceRescan(ctx context.Context,
-	devicePath string) error {
+func (fs *FS) deviceRescan(_ context.Context,
+	devicePath string,
+) error {
 	path := filepath.Clean(devicePath)
 	if err := validatePath(path); err != nil {
 		return err
@@ -673,7 +672,8 @@ func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
 func (fs *FS) readProcMounts(
 	ctx context.Context,
 	path string,
-	info bool) ([]Info, uint32, error) {
+	info bool,
+) ([]Info, uint32, error) {
 	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, 0, err

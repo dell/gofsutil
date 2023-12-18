@@ -41,8 +41,8 @@ import (
 func (fs *FS) mount(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	// All Linux distributes should support bind mounts.
 	if opts, ok := fs.isBind(ctx, opts...); ok {
 		return fs.bindMount(ctx, source, target, opts...)
@@ -52,7 +52,6 @@ func (fs *FS) mount(
 
 // validateMountArgs validates the arguments for mount operation.
 func (fs *FS) validateMountArgs(source, target, fsType string, opts ...string) error {
-
 	sourcePath := filepath.Clean(source)
 	targetPath := filepath.Clean(target)
 
@@ -81,8 +80,8 @@ func (fs *FS) validateMountArgs(source, target, fsType string, opts ...string) e
 func (fs *FS) doMount(
 	ctx context.Context,
 	mntCmd, source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	if err := fs.validateMountArgs(source, target, fsType, opts...); err != nil {
 		return err
 	}
@@ -99,7 +98,7 @@ func (fs *FS) doMount(
 	buf, err := exec.Command(mntCmd, mountArgs...).CombinedOutput()
 	if err != nil {
 		out := string(buf)
-		//check is explicitly placed for PowerScale driver only
+		// check is explicitly placed for PowerScale driver only
 		if !(strings.Contains(args, "/ifs") && (strings.Contains(strings.ToLower(out), "access denied by server while mounting") || strings.Contains(strings.ToLower(out), "no such file or directory"))) {
 			log.WithFields(f).WithField("output", out).WithError(
 				err).Error("mount Failed")
@@ -112,7 +111,7 @@ func (fs *FS) doMount(
 }
 
 // unmount unmounts the target.
-func (fs *FS) unmount(ctx context.Context, target string) error {
+func (fs *FS) unmount(_ context.Context, target string) error {
 	f := log.Fields{
 		"path": target,
 		"cmd":  "umount",
@@ -140,7 +139,7 @@ func (fs *FS) unmount(ctx context.Context, target string) error {
 //
 // The returned options will be "bind", "remount", and the provided
 // list of options.
-func (fs *FS) isBind(ctx context.Context, opts ...string) ([]string, bool) {
+func (fs *FS) isBind(_ context.Context, opts ...string) ([]string, bool) {
 	bind := false
 	remountOpts := append([]string(nil), bindRemountOpts...)
 
@@ -161,7 +160,6 @@ func (fs *FS) isBind(ctx context.Context, opts ...string) ([]string, bool) {
 
 // getDevMounts returns a slice of all mounts for dev
 func (fs *FS) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
-
 	allMnts, err := fs.getMounts(ctx)
 	if err != nil {
 		return nil, err
@@ -178,8 +176,8 @@ func (fs *FS) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
 }
 
 func (fs *FS) validateDevice(
-	ctx context.Context, source string) (string, error) {
-
+	ctx context.Context, source string,
+) (string, error) {
 	if _, err := os.Lstat(source); err != nil {
 		return "", err
 	}
@@ -205,8 +203,8 @@ func (fs *FS) validateDevice(
 // and returns a) the symlink path in /dev/disk/by-id and
 // b) the corresponding device entry in /dev.
 func (fs *FS) wwnToDevicePath(
-	ctx context.Context, wwn string) (string, string, error) {
-
+	_ context.Context, wwn string,
+) (string, string, error) {
 	// Look for multipath device.
 	symlinkPath := fmt.Sprintf("%s%s", MultipathDevDiskByIDPrefix, wwn)
 	devPath, err := os.Readlink(symlinkPath)
@@ -228,7 +226,7 @@ func (fs *FS) wwnToDevicePath(
 }
 
 // targetIPLUNToDevicePath returns all the /dev/disk/by-path entries for a give targetIP and lunID
-func (fs *FS) targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+func (fs *FS) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID int) (map[string]string, error) {
 	result := make(map[string]string, 0)
 	bypathdir := "/dev/disk/by-path"
 	entries, err := os.ReadDir(bypathdir)
@@ -280,7 +278,7 @@ func (td *targetdev) String() string {
 // If targets are specified, only hosts who are related to the specified
 // iqn target(s) are rescanned.
 // If lun is specified, then the rescan is for that particular volume.
-func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) error {
+func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) error {
 	var err error
 	// If no lun is specifed, the "-" character is a wildcard that will update all LUNs.
 	if lun == "" {
@@ -315,7 +313,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 			scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, entry.host)
 			scanstring := fmt.Sprintf("%s %s %s", entry.channel, entry.target, lun)
 			log.Printf("rescanning %s with: "+scanstring, scanfile)
-			f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0200)
+			f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0o200)
 			if err != nil {
 				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
 				continue
@@ -347,7 +345,7 @@ func (fs *FS) rescanSCSIHost(ctx context.Context, targets []string, lun string) 
 		scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, host.Name())
 		scanstring := fmt.Sprintf("- - %s", lun)
 		log.Printf("rescanning %s with: "+scanstring, scanfile)
-		f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
 			continue
@@ -506,7 +504,7 @@ func splitTargets(targets []string) ([]string, []string) {
 // removeBlockDevice removes a block device by getting the device name
 // from the last component of the blockDevicePath and then removing the
 // device by writing '1' to /sys/block{deviceName}/device/delete
-func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) error {
+func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error {
 	// Here we want to remove /sys/block/{deviceName} by writing a 1 to
 	// /sys/block{deviceName}/device/delete
 	devicePathComponents := strings.Split(blockDevicePath, "/")
@@ -522,7 +520,7 @@ func (fs *FS) removeBlockDevice(ctx context.Context, blockDevicePath string) err
 			return fmt.Errorf("Device %s is in blocked state", deviceName)
 		}
 		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
-		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")
 			return err
@@ -578,7 +576,7 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 }
 
 // getFCHostPortWWNs returns the port WWN addresses of local FC adapters.
-func (fs *FS) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
+func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 	portWWNs := make([]string, 0)
 	// Read the directory entries for fc_remote_ports
 	fcHostsDir := "/sys/class/fc_host"
@@ -605,7 +603,7 @@ func (fs *FS) getFCHostPortWWNs(ctx context.Context) ([]string, error) {
 }
 
 // issueLIPToAllFCHosts issues the LIP command to all FC hosts.
-func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
+func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 	var savedError error
 	// Read the directory entries for fc_remote_ports
 	fcHostsDir := "/sys/class/fc_host"
@@ -623,7 +621,7 @@ func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
 		lipFile := fmt.Sprintf("%s/%s/issue_lip", fcHostsDir, hostEntry.Name())
 		lipString := fmt.Sprintf("%s", "1")
 		log.Printf("issuing lip command %s to %s", lipString, lipFile)
-		f, err := os.OpenFile(filepath.Clean(lipFile), os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filepath.Clean(lipFile), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.Error("Could not open issue_lip file at: " + lipFile)
 			continue
@@ -641,7 +639,7 @@ func (fs *FS) issueLIPToAllFCHosts(ctx context.Context) error {
 }
 
 // getSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
-func (fs *FS) getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
+func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	start := time.Now()
 	result := make([]string, 0)
 	sysBlockDir := "/sys/block"

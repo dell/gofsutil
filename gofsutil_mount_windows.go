@@ -43,9 +43,11 @@ func (fs *FS) resizeFS(ctx context.Context, volumePath, devicePath, ppathDevice,
 
 // findFSType fetches the filesystem type on mountpoint
 func (fs *FS) findFSType(
-	ctx context.Context, mountpoint string) (fsType string, err error) {
+	ctx context.Context, mountpoint string,
+) (fsType string, err error) {
 	return "", errors.New("not implemented")
 }
+
 func (fs *FS) getMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo, error) {
 	return nil, errors.New("not implemented")
 }
@@ -60,18 +62,19 @@ func (fs *FS) resizeMultipath(ctx context.Context, deviceName string) error {
 
 // DeviceRescan rescan the device for size alterations
 func (fs *FS) deviceRescan(ctx context.Context,
-	devicePath string) error {
+	devicePath string,
+) error {
 	return errors.New("not implemented")
 }
 
 func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
-
 	return info, errors.New("not implemented")
 }
 
 func (fs *FS) readProcMounts(ctx context.Context,
 	path string,
-	info bool) ([]Info, uint32, error) {
+	info bool,
+) ([]Info, uint32, error) {
 	return nil, 0, errors.New("not implemented")
 }
 
@@ -89,12 +92,14 @@ func (fs *FS) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
 }
 
 func (fs *FS) validateDevice(
-	ctx context.Context, source string) (string, error) {
+	ctx context.Context, source string,
+) (string, error) {
 	return "", errors.New("not implemented")
 }
 
 func (fs *FS) wwnToDevicePath(
-	ctx context.Context, wwn string) (string, string, error) {
+	ctx context.Context, wwn string,
+) (string, string, error) {
 	return "", "", errors.New("not implemented")
 }
 

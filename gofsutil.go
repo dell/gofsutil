@@ -75,10 +75,8 @@ type FSinterface interface {
 	FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
 }
 
-var (
-	// MultipathDevDiskByIDPrefix is a pathname prefix for items located in /dev/disk/by-id
-	MultipathDevDiskByIDPrefix = "/dev/disk/by-id/dm-uuid-mpath-3"
-)
+// MultipathDevDiskByIDPrefix is a pathname prefix for items located in /dev/disk/by-id
+var MultipathDevDiskByIDPrefix = "/dev/disk/by-id/dm-uuid-mpath-3"
 
 var (
 	// ErrNotImplemented is returned when a platform does not implement
@@ -111,8 +109,8 @@ func GetDiskFormat(ctx context.Context, disk string) (string, error) {
 func FormatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	return fs.FormatAndMount(ctx, source, target, fsType, opts...)
 }
 
@@ -120,8 +118,8 @@ func FormatAndMount(
 func Format(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	return fs.Format(ctx, source, target, fsType, opts...)
 }
 
@@ -137,8 +135,8 @@ func Format(
 func Mount(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	return fs.Mount(ctx, source, target, fsType, opts...)
 }
 
@@ -147,8 +145,8 @@ func Mount(
 func BindMount(
 	ctx context.Context,
 	source, target string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	return fs.BindMount(ctx, source, target, opts...)
 }
 
@@ -171,7 +169,8 @@ func GetMpathNameFromDevice(ctx context.Context, device string) (string, error) 
 func ResizeFS(
 	ctx context.Context,
 	volumePath, devicePath, ppathDevice,
-	mpathDevice, fsType string) error {
+	mpathDevice, fsType string,
+) error {
 	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
@@ -182,13 +181,15 @@ func ResizeMultipath(ctx context.Context, deviceName string) error {
 
 // FindFSType fetches the filesystem type on mountpoint
 func FindFSType(
-	ctx context.Context, mountpoint string) (fsType string, err error) {
+	ctx context.Context, mountpoint string,
+) (fsType string, err error) {
 	return fs.findFSType(ctx, mountpoint)
 }
 
 // DeviceRescan rescan the device for size alterations
 func DeviceRescan(ctx context.Context,
-	devicePath string) error {
+	devicePath string,
+) error {
 	return fs.deviceRescan(ctx, devicePath)
 }
 
@@ -217,7 +218,7 @@ func GetDevMounts(ctx context.Context, dev string) ([]Info, error) {
 // EvalSymlinks evaluates the provided path and updates it to remove
 // any symlinks in its structure, replacing them with the actual path
 // components.
-func EvalSymlinks(ctx context.Context, symPath *string) error {
+func EvalSymlinks(_ context.Context, symPath *string) error {
 	realPath, err := filepath.EvalSymlinks(*symPath)
 	if err != nil {
 		return err
