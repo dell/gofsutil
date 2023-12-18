@@ -30,7 +30,6 @@ var (
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformated
 func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
-
 	mps, err := fs.getMounts(ctx)
 	if err != nil {
 		return "", err
@@ -47,8 +46,8 @@ func (fs *FS) getDiskFormat(ctx context.Context, disk string) (string, error) {
 func (fs *FS) formatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	return ErrNotImplemented
 }
 
@@ -56,14 +55,13 @@ func (fs *FS) formatAndMount(
 func (fs *FS) format(
 	ctx context.Context,
 	source, target, fsType string,
-	opts ...string) error {
-
+	opts ...string,
+) error {
 	return ErrNotImplemented
 }
 
 // getMounts returns a slice of all the mounted filesystems
 func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
-
 	out, err := exec.Command("mount").CombinedOutput()
 	if err != nil {
 		return nil, err
@@ -113,14 +111,15 @@ func (fs *FS) getMounts(ctx context.Context) ([]Info, error) {
 // bindMount performs a bind mount
 func (fs *FS) bindMount(
 	ctx context.Context,
-	source, target string, opts ...string) error {
-
+	source, target string, opts ...string,
+) error {
 	return fs.doMount(ctx, "bindfs", source, target, "", opts...)
 }
 
 // readProcMounts is not implemented for darwin but defined for testing purposes
 func (fs *FS) readProcMounts(ctx context.Context,
 	path string,
-	info bool) ([]Info, uint32, error) {
+	info bool,
+) ([]Info, uint32, error) {
 	return nil, 0, errors.New("not implemented")
 }

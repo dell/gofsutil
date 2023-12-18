@@ -53,7 +53,6 @@ func TestValidatePath(t *testing.T) {
 					}
 				}
 			}
-
 		})
 	}
 }
@@ -105,7 +104,6 @@ func TestValidateFsType(t *testing.T) {
 					}
 				}
 			}
-
 		})
 	}
 }

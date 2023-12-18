@@ -23,7 +23,7 @@ import (
 )
 
 func newTestEntryScanFunc(t *testing.T) gofsutil.EntryScanFunc {
-	//return gofsutil.DefaultEntryScanFunc()
+	// return gofsutil.DefaultEntryScanFunc()
 	return (&testEntryScanFunc{t}).scan
 }
 
@@ -32,11 +32,11 @@ type testEntryScanFunc struct {
 }
 
 func (p *testEntryScanFunc) scan(
-	ctx context.Context,
+	_ context.Context,
 	entry gofsutil.Entry,
 	cache map[string]gofsutil.Entry) (
-	info gofsutil.Info, valid bool, failed error) {
-
+	info gofsutil.Info, valid bool, failed error,
+) {
 	// p.t.Logf("root=%s\tmountPoint=%s\t"+
 	// 	"fsType=%s\tmountSource=%s\tmountOpts=%v",
 	// 	root, mountPoint, fsType, mountSource, mountOpts)
@@ -81,7 +81,6 @@ func (p *testEntryScanFunc) scan(
 }
 
 func TestReadProcMountsFrom(t *testing.T) {
-
 	mountInfos, _, err := gofsutil.ReadProcMountsFrom(
 		context.TODO(),
 		strings.NewReader(procMountInfoData),

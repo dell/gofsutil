@@ -21,7 +21,6 @@ import (
 
 // FS provides many filesystem-specific functions, such as mount, format, etc.
 type FS struct {
-
 	// ScanEntry is the function used to process mount table entries.
 	ScanEntry EntryScanFunc
 }
@@ -35,8 +34,8 @@ func (fs *FS) GetDiskFormat(ctx context.Context, disk string) (string, error) {
 func (fs *FS) FormatAndMount(
 	ctx context.Context,
 	source, target, fsType string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	return fs.formatAndMount(ctx, source, target, fsType, options...)
 }
 
@@ -44,8 +43,8 @@ func (fs *FS) FormatAndMount(
 func (fs *FS) Format(
 	ctx context.Context,
 	source, target, fsType string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	return fs.format(ctx, source, target, fsType, options...)
 }
 
@@ -61,8 +60,8 @@ func (fs *FS) Format(
 func (fs *FS) Mount(
 	ctx context.Context,
 	source, target, fsType string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	return fs.mount(ctx, source, target, fsType, options...)
 }
 
@@ -71,8 +70,8 @@ func (fs *FS) Mount(
 func (fs *FS) BindMount(
 	ctx context.Context,
 	source, target string,
-	options ...string) error {
-
+	options ...string,
+) error {
 	if options == nil {
 		options = []string{"bind"}
 	} else {
@@ -100,13 +99,15 @@ func (fs *FS) GetMpathNameFromDevice(ctx context.Context, device string) (string
 func (fs *FS) ResizeFS(
 	ctx context.Context,
 	volumePath, devicePath, ppathDevice,
-	mpathDevice, fsType string) error {
+	mpathDevice, fsType string,
+) error {
 	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
 // FindFSType fetches the filesystem type on mountpoint
 func (fs *FS) FindFSType(
-	ctx context.Context, mountpoint string) (fsType string, err error) {
+	ctx context.Context, mountpoint string,
+) (fsType string, err error) {
 	return fs.findFSType(ctx, mountpoint)
 }
 
@@ -117,7 +118,8 @@ func (fs *FS) ResizeMultipath(ctx context.Context, deviceName string) error {
 
 // DeviceRescan rescan the device for size alterations
 func (fs *FS) DeviceRescan(ctx context.Context,
-	devicePath string) error {
+	devicePath string,
+) error {
 	return fs.deviceRescan(ctx, devicePath)
 }
 
@@ -148,8 +150,8 @@ func (fs *FS) GetDevMounts(ctx context.Context, dev string) ([]Info, error) {
 // evaluated and returned as an absolute path without any symlinks.
 // Otherwise an empty string is returned.
 func (fs *FS) ValidateDevice(
-	ctx context.Context, source string) (string, error) {
-
+	ctx context.Context, source string,
+) (string, error) {
 	return fs.validateDevice(ctx, source)
 }
 
@@ -182,7 +184,7 @@ func (fs *FS) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration
 
 // fsInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
-func (fs *FS) fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+func (fs *FS) fsInfo(_ context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {

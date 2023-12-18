@@ -150,7 +150,8 @@ func benchmarkRemoveDuplicates(b *testing.B, f rdf, d []string) {
 }
 
 var benchRemoveDupesData = []string{
-	"a", "b", "b", "c", "cat", "", "cat2", "dog", "dog", "z", ""}
+	"a", "b", "b", "c", "cat", "", "cat2", "dog", "dog", "z", "",
+}
 
 type rdf func([]string) []string
 
