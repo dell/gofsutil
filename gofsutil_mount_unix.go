@@ -69,11 +69,7 @@ func (fs *FS) validateMountArgs(source, target, fsType string, opts ...string) e
 		}
 	}
 
-	if err := validateMountOptions(opts...); err != nil {
-		return err
-	}
-
-	return nil
+	return validateMountOptions(opts...)
 }
 
 // doMount runs the mount command.

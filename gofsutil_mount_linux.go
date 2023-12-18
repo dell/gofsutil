@@ -679,10 +679,7 @@ func (fs *FS) readProcMounts(
 		return nil, 0, err
 	}
 	defer func() error {
-		if err := file.Close(); err != nil {
-			return err
-		}
-		return nil
+		return file.Close()
 	}()
 	return ReadProcMountsFrom(ctx, file, !info, ProcMountsFields, fs.ScanEntry)
 }
