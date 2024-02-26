@@ -149,7 +149,7 @@ func TestWWNToDevicePath(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run("", func(st *testing.T) {
+		t.Run("", func(_ *testing.T) {
 			// Change directories
 			workingDirectory, _ := os.Getwd()
 			err := os.Chdir("/dev/disk/by-id")
