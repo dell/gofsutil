@@ -201,6 +201,13 @@ func (fs *FS) validateDevice(
 func (fs *FS) wwnToDevicePath(
 	_ context.Context, wwn string,
 ) (string, string, error) {
+	// print all the available devies:
+	buf, err := exec.Command("ls", "-la", "/dev/disk/by-id/").CombinedOutput()
+	if err != nil {
+		log.Printf("Check for ls -la %s err", err.Error())
+		return "", "", err
+	}
+	log.Printf("**: ls -la: %s date: %s", string(buf), time.Now().UTC())
 	// Look for multipath device.
 	symlinkPath := fmt.Sprintf("%s%s", MultipathDevDiskByIDPrefix, wwn)
 	devPath, err := os.Readlink(symlinkPath)
