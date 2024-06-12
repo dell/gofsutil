@@ -205,13 +205,18 @@ func (fs *FS) wwnToDevicePath(
 	symlinkPath := fmt.Sprintf("%s%s", MultipathDevDiskByIDPrefix, wwn)
 	devPath, err := os.Readlink(symlinkPath)
 
-	// Look for regular path device.
+	// Look for nvme path device.
 	if err != nil || devPath == "" {
-		symlinkPath = fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+		symlinkPath = fmt.Sprintf("/dev/disk/by-id/nvme-eui.%s", wwn)
 		devPath, err = os.Readlink(symlinkPath)
-		if err != nil {
-			log.Printf("Check for disk path %s not found", symlinkPath)
-			return "", "", err
+		if err != nil || devPath == "" {
+			// Look for normal path device
+			symlinkPath = fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+			devPath, err = os.Readlink(symlinkPath)
+			if err != nil {
+				log.Printf("Check for disk path %s not found", symlinkPath)
+				return "", "", err
+			}
 		}
 	}
 	components := strings.Split(devPath, "/")
