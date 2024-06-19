@@ -147,6 +147,12 @@ func TestWWNToDevicePath(t *testing.T) {
 			wwn:    "60570970000197900046533030394146",
 			result: "/dev/mydevb",
 		},
+		{
+			src:    "/dev/disk/by-id/nvme-eui.12635330303134340000976000012000",
+			tgt:    "../../mydevb",
+			wwn:    "12635330303134340000976000012000",
+			result: "/dev/mydevb",
+		},
 	}
 	for _, tt := range tests {
 		t.Run("", func(_ *testing.T) {
