@@ -103,7 +103,7 @@ func (fs *FS) formatAndMount(
 	if len(opts) > 0 {
 		fsFormatOptionString = opts[len(opts)-1]
 		if strings.HasPrefix(fsFormatOptionString, "fsFormatOption:") {
-			fsFormatOptionString = strings.TrimPrefix(fsFormatOptionString, "fsFormatOption")
+			fsFormatOptionString = strings.TrimPrefix(fsFormatOptionString, "fsFormatOption:")
 			fsFormatOption = strings.Split(fsFormatOptionString, " ")
 			opts = opts[0 : len(opts)-1]
 		}
