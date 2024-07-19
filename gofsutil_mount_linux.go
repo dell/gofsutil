@@ -189,8 +189,8 @@ func (fs *FS) formatAndMount(
 		log.Printf("mkfs args: %v", args)
 
 		mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
-		/* #nosec G204 */
-		if err := exec.Command(mkfsCmd, args...).Run(); err != nil {
+		err := exec.Command(mkfsCmd, args...).Run() // #nosec G204
+		if err != nil {
 			log.WithFields(f).WithError(err).Error(
 				"format of disk failed")
 		} else {
@@ -333,7 +333,7 @@ func (fs *FS) getMpathNameFromDevice(
 	}
 	fmt.Println(cmd)
 
-	buf, _ := exec.Command("bash", "-c", cmd).Output()
+	buf, _ := exec.Command("bash", "-c", cmd).Output() // #nosec G204
 	output := string(buf)
 	mpathDeviceRegx := regexp.MustCompile(`NAME="\S+"`)
 	mpath := mpathDeviceRegx.FindString(output)
@@ -355,7 +355,7 @@ func (fs *FS) getNativeDevicesFromPpath(
 	cmd := fmt.Sprintf("%s/%s", "/noderoot/sbin", ppinqtool)
 	log.Debug("pp_inq cmd:", cmd)
 	args := []string{"-wwn", "-dev", deviceName}
-	out, err := exec.Command(cmd, args...).CombinedOutput()
+	out, err := exec.Command(cmd, args...).CombinedOutput() // #nosec G204
 	if err != nil {
 		log.Errorf("Error powermt display %s: %v", deviceName, err)
 		return devices, err
@@ -574,7 +574,7 @@ func reReadPartitionTable(_ context.Context, devicePath string) error {
 		return fmt.Errorf("Failed to validate path: %s error %v", devicePath, err)
 	}
 	args := []string{path}
-	_, err := exec.Command("partprobe", args...).CombinedOutput()
+	_, err := exec.Command("partprobe", args...).CombinedOutput() // #nosec G204
 	if err != nil {
 		log.Errorf("Failed to execute partprobe on %s: %s", devicePath, err.Error())
 		return err
