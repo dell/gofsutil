@@ -11,5 +11,5 @@ on:
         default: 'none'
 jobs:
   csm-release:
-    uses: dell/common-github-actions/.github/workflows/csm-release-libs.yaml@feature/lib-release-automation
+    uses: dell/common-github-actions/.github/workflows/csm-release-libs.yaml@main
     name: Release Go Client Libraries
