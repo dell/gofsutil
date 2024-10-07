@@ -571,7 +571,7 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 		log.Error("multipath command failed: " + err.Error())
 	}
 	if len(textBytes) > 0 {
-		log.Debug(fmt.Sprintf("multipath output: %s" + string(textBytes)))
+		log.Debugf("multipath output: %s" + string(textBytes))
 	}
 	return textBytes, err
 }
