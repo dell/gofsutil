@@ -572,7 +572,7 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 	}
 	if len(textBytes) > 0 {
 		data := string(textBytes)
-		log.Debug("multipath output:" + data)
+		log.Debug("multipath output:", data)
 	}
 	return textBytes, err
 }
