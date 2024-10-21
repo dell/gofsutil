@@ -648,24 +648,97 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string
 	if err != nil {
 		return result, fmt.Errorf("Error reading %s: %s", sysBlockDir, err)
 	}
+
 	for _, sysBlock := range sysBlocks {
 		name := sysBlock.Name()
-		if !strings.HasPrefix(name, "sd") {
+		// Check for both "sd" and "nvme" prefixes
+		if !strings.HasPrefix(name, "sd") && !strings.HasPrefix(name, "nvme") {
 			continue
 		}
-		wwidPath := sysBlockDir + "/" + name + "/device/wwid"
+
+		// Set the WWID path based on the device type
+		var wwidPath string
+		if strings.HasPrefix(name, "nvme") {
+			wwidPath = sysBlockDir + "/" + name + "/wwid" // For NVMe devices
+		} else {
+			wwidPath = sysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
+		}
+
 		bytes, err := os.ReadFile(filepath.Clean(wwidPath))
 		if err != nil {
 			continue
 		}
+
 		wwid := strings.TrimSpace(string(bytes))
-		wwid = strings.Replace(wwid, "naa.", "", 1)
-		if wwid == volumeWWN {
-			result = append(result, name)
+
+		// Replace "eui." for NVMe devices and "naa." for others
+		if strings.HasPrefix(name, "nvme") {
+			wwid = strings.Replace(wwid, "eui.", "", 1)
+			// Use wwnMatches for NVMe comparison
+			if wwnMatches(wwid, volumeWWN) {
+				result = append(result, name)
+			}
+		} else {
+			wwid = strings.Replace(wwid, "naa.", "", 1)
+			// Compare directly for SCSI devices
+			if wwid == volumeWWN {
+				result = append(result, name)
+			}
 		}
 	}
+
 	end := time.Now()
 	dur := end.Sub(start)
 	log.Printf("getSysBlockDevicesForVolumeWWN %d %f", len(sysBlocks), dur.Seconds())
 	return result, nil
+}
+
+func wwnMatches(nguid, wwn string) bool {
+	/*
+			// PowerStore
+			Sample wwn : naa.68ccf098001111a2222b3d4444a1b23c
+			token1: 1111a2222b3d4444
+			token2: a1b23c
+			Sample nguid : 1111a2222b3d44448ccf096800a1b23c
+
+			// PowerMax
+			nguid: 12635330303134340000976000012000
+			wwn:   60000970000120001263533030313434
+		           11aaa111111111a11a111a1111aa1111
+		           1a111a1111aa1111 1aaa11 1 1111111a1
+			nguid: wwn[last16] 		+ wwn[1:6] 	+ wwn[0] + wwn[7:15]
+				   1263533030313434 + 000097 	+ 6		 + 000012000
+	*/
+	// PowerMaxOUIPrefix - PowerMax format 6 OUI prefix
+	PowerMaxOUIPrefix := "6000097"
+
+	// PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
+	PowerStoreOUIPrefix := "68ccf09"
+	if len(wwn) < 32 {
+		return false
+	}
+
+	wwn = strings.ToLower(wwn)
+	if strings.HasPrefix(wwn, "naa.") {
+		wwn = wwn[4:]
+	}
+
+	var token1, token2 string
+	if strings.HasPrefix(wwn, PowerStoreOUIPrefix) {
+		token1 = wwn[13 : len(wwn)-7]
+		token2 = wwn[len(wwn)-6 : len(wwn)-1]
+		log.Infof("PowerStore: %s %s %s %t", token1, token2, nguid, strings.Contains(nguid, token2))
+		if strings.Contains(nguid, token1) && strings.Contains(nguid, token2) {
+			return true
+		}
+	} else if strings.HasPrefix(wwn, PowerMaxOUIPrefix) {
+		token1 = wwn[16:]
+		token2 = wwn[1:7]
+		log.Infof("Powermax: %s %s %s %t", token1, token2, nguid, strings.HasPrefix(nguid, token1+token2))
+		if strings.HasPrefix(nguid, token1+token2) {
+			return true
+		}
+	}
+
+	return false
 }
