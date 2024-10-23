@@ -15,9 +15,13 @@ package gofsutil_test
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dell/gofsutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBindMount(t *testing.T) {
@@ -79,5 +83,69 @@ func TestGetMounts(t *testing.T) {
 	}
 	for _, m := range mounts {
 		t.Logf("%+v", m)
+	}
+}
+
+func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
+	tempDir := t.TempDir()
+	gofsutil.UseMockSysBlockDir(tempDir)
+
+	tests := []struct {
+		name           string
+		wwn            string
+		nguid          string
+		deviceName     string
+		deviceWwidPath []string
+		expect         []string
+		errString      string
+	}{
+		{
+			name:           "iscsi block device",
+			wwn:            "example-volume-wwn",
+			deviceName:     "sdx",
+			deviceWwidPath: []string{"device", "wwid"},
+			expect:         []string{"sdx"},
+			errString:      "",
+		},
+		{
+			name:           "PowerStore nvme block device",
+			wwn:            "naa.68ccf098001111a2222b3d4444a1b23c",
+			nguid:          "eui.1111a2222b3d44448ccf096800a1b23c",
+			deviceName:     "nvme0n1",
+			deviceWwidPath: []string{"wwid"},
+			expect:         []string{"nvme0n1"},
+			errString:      "",
+		},
+		{
+			name:           "PowerMax nvme block device",
+			wwn:            "naa.60000970000120001263533030313434",
+			nguid:          "eui.12635330303134340000976000012000",
+			deviceName:     "nvme0n2",
+			deviceWwidPath: []string{"wwid"},
+			expect:         []string{"nvme0n2"},
+			errString:      "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the necessary directories and files
+			path := []string{tempDir, tt.deviceName}
+			path = append(path, tt.deviceWwidPath...)
+			deviceWwidPath := filepath.Join(path...)
+			err := os.MkdirAll(filepath.Dir(deviceWwidPath), 0755)
+			require.Nil(t, err)
+			if strings.HasPrefix(tt.deviceName, "nvme") {
+				err = os.WriteFile(deviceWwidPath, []byte(tt.nguid), 0644)
+			} else {
+				err = os.WriteFile(deviceWwidPath, []byte(tt.wwn), 0644)
+			}
+			require.Nil(t, err)
+
+			// Call the function with the test input
+			result, err := gofsutil.GetSysBlockDevicesForVolumeWWN(context.Background(), tt.wwn)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.expect, result)
+		})
 	}
 }

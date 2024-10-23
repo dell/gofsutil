@@ -643,10 +643,9 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	start := time.Now()
 	result := make([]string, 0)
-	sysBlockDir := "/sys/block"
-	sysBlocks, err := os.ReadDir(sysBlockDir)
+	sysBlocks, err := os.ReadDir(fs.SysBlockDir)
 	if err != nil {
-		return result, fmt.Errorf("Error reading %s: %s", sysBlockDir, err)
+		return result, fmt.Errorf("Error reading %s: %s", fs.SysBlockDir, err)
 	}
 
 	for _, sysBlock := range sysBlocks {
@@ -659,9 +658,9 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string
 		// Set the WWID path based on the device type
 		var wwidPath string
 		if strings.HasPrefix(name, "nvme") {
-			wwidPath = sysBlockDir + "/" + name + "/wwid" // For NVMe devices
+			wwidPath = fs.SysBlockDir + "/" + name + "/wwid" // For NVMe devices
 		} else {
-			wwidPath = sysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
+			wwidPath = fs.SysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
 		}
 
 		bytes, err := os.ReadFile(filepath.Clean(wwidPath))
