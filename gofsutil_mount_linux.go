@@ -621,7 +621,12 @@ func (fs *FS) deviceRescan(_ context.Context,
 	if err := validatePath(path); err != nil {
 		return err
 	}
-	device := path + "/device/rescan"
+	var device string
+	if strings.Contains(devicePath, "nvme") {
+		device = path + "/device/rescan_controller"
+	} else {
+		device = path + "/device/rescan"
+	}
 	args := []string{"-c", "echo 1 > " + device}
 	log.Infof("Executing rescan command on device (%s)", devicePath)
 	/* #nosec G204 */

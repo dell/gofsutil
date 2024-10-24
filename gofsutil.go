@@ -84,7 +84,7 @@ var (
 	ErrNotImplemented = errors.New("not implemented")
 
 	// fs is the default FS instance.
-	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
+	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc, SysBlockDir: "/sys/block"}
 )
 
 // ContextKey is a variable containing context-keys
@@ -98,6 +98,11 @@ const NoDiscard = "NoDiscard"
 // for calls using gofsutils.
 func UseMockFS() {
 	fs = &mockfs{ScanEntry: defaultEntryScanFunc}
+}
+
+// UseMockSysBlockDir creates a file system for testing.
+func UseMockSysBlockDir(mockSysBlockDir string) {
+	fs = &FS{ScanEntry: defaultEntryScanFunc, SysBlockDir: mockSysBlockDir}
 }
 
 // GetDiskFormat uses 'lsblk' to see if the given disk is unformatted.
