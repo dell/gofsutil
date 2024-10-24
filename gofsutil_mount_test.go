@@ -133,12 +133,12 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 			path := []string{tempDir, tt.deviceName}
 			path = append(path, tt.deviceWwidPath...)
 			deviceWwidFile := filepath.Join(path...)
-			err := os.MkdirAll(filepath.Dir(deviceWwidFile), 0755)
+			err := os.MkdirAll(filepath.Dir(deviceWwidFile), 0o755)
 			require.Nil(t, err)
 			if strings.HasPrefix(tt.deviceName, "nvme") {
-				err = os.WriteFile(deviceWwidFile, []byte(tt.nguid), 0600)
+				err = os.WriteFile(deviceWwidFile, []byte(tt.nguid), 0o600)
 			} else {
-				err = os.WriteFile(deviceWwidFile, []byte(tt.wwn), 0600)
+				err = os.WriteFile(deviceWwidFile, []byte(tt.wwn), 0o600)
 			}
 			require.Nil(t, err)
 
@@ -191,9 +191,9 @@ func TestDeviceRescan(t *testing.T) {
 			devicePath := tt.deviceName
 			if !strings.Contains(tt.name, "invalid") {
 				devicePath = filepath.Join(tempDir, tt.deviceName)
-				err := os.MkdirAll(filepath.Dir(deviceRescanFile), 0755)
+				err := os.MkdirAll(filepath.Dir(deviceRescanFile), 0o755)
 				require.Nil(t, err)
-				err = os.WriteFile(deviceRescanFile, nil, 0600)
+				err = os.WriteFile(deviceRescanFile, nil, 0o600)
 				require.Nil(t, err)
 			}
 
