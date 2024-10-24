@@ -132,13 +132,13 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 			// Create the necessary directories and files
 			path := []string{tempDir, tt.deviceName}
 			path = append(path, tt.deviceWwidPath...)
-			deviceWwidPath := filepath.Join(path...)
-			err := os.MkdirAll(filepath.Dir(deviceWwidPath), 0755)
+			deviceWwidFile := filepath.Join(path...)
+			err := os.MkdirAll(filepath.Dir(deviceWwidFile), 0755)
 			require.Nil(t, err)
 			if strings.HasPrefix(tt.deviceName, "nvme") {
-				err = os.WriteFile(deviceWwidPath, []byte(tt.nguid), 0644)
+				err = os.WriteFile(deviceWwidFile, []byte(tt.nguid), 0644)
 			} else {
-				err = os.WriteFile(deviceWwidPath, []byte(tt.wwn), 0644)
+				err = os.WriteFile(deviceWwidFile, []byte(tt.wwn), 0644)
 			}
 			require.Nil(t, err)
 
@@ -146,6 +146,69 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 			result, err := gofsutil.GetSysBlockDevicesForVolumeWWN(context.Background(), tt.wwn)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expect, result)
+		})
+	}
+}
+
+func TestDeviceRescan(t *testing.T) {
+	tempDir := t.TempDir()
+	tests := []struct {
+		name           string
+		deviceName     string
+		rescanFilePath []string
+		wantError      bool
+	}{
+		{
+			name:           "nvme device",
+			deviceName:     "nvme0n1",
+			rescanFilePath: []string{"device", "rescan_controller"},
+			wantError:      false,
+		},
+		{
+			name:           "iscsi device",
+			deviceName:     "sda1",
+			rescanFilePath: []string{"device", "rescan"},
+			wantError:      false,
+		},
+		{
+			name:       "invalid device",
+			deviceName: "invalid",
+			wantError:  true,
+		},
+		{
+			name:       "invalid path",
+			deviceName: "/",
+			wantError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the necessary directories and files
+			path := []string{tempDir, tt.deviceName}
+			path = append(path, tt.rescanFilePath...)
+			deviceRescanFile := filepath.Join(path...)
+			devicePath := tt.deviceName
+			if !strings.Contains(tt.name, "invalid") {
+				devicePath = filepath.Join(tempDir, tt.deviceName)
+				err := os.MkdirAll(filepath.Dir(deviceRescanFile), 0755)
+				require.Nil(t, err)
+				err = os.WriteFile(deviceRescanFile, nil, 0644)
+				require.Nil(t, err)
+			}
+
+			// Call the function with the test input
+			err := gofsutil.DeviceRescan(context.Background(), devicePath)
+			if (err != nil) != tt.wantError {
+				t.Errorf("DeviceRescan() error = %v, wantError %v", err, tt.wantError)
+			} else if err == nil {
+				data, err := os.ReadFile(deviceRescanFile)
+				dataStr := strings.TrimSpace(string(data))
+				require.Nil(t, err)
+				if !strings.EqualFold(dataStr, "1") {
+					t.Errorf("DeviceRescan() file data = %s, want 1", dataStr)
+				}
+			}
 		})
 	}
 }
