@@ -136,9 +136,9 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 			err := os.MkdirAll(filepath.Dir(deviceWwidFile), 0755)
 			require.Nil(t, err)
 			if strings.HasPrefix(tt.deviceName, "nvme") {
-				err = os.WriteFile(deviceWwidFile, []byte(tt.nguid), 0644)
+				err = os.WriteFile(deviceWwidFile, []byte(tt.nguid), 0600)
 			} else {
-				err = os.WriteFile(deviceWwidFile, []byte(tt.wwn), 0644)
+				err = os.WriteFile(deviceWwidFile, []byte(tt.wwn), 0600)
 			}
 			require.Nil(t, err)
 
@@ -193,7 +193,7 @@ func TestDeviceRescan(t *testing.T) {
 				devicePath = filepath.Join(tempDir, tt.deviceName)
 				err := os.MkdirAll(filepath.Dir(deviceRescanFile), 0755)
 				require.Nil(t, err)
-				err = os.WriteFile(deviceRescanFile, nil, 0644)
+				err = os.WriteFile(deviceRescanFile, nil, 0600)
 				require.Nil(t, err)
 			}
 
