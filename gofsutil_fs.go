@@ -240,3 +240,8 @@ func (fs *FS) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN stri
 func (fs *FS) FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.fsInfo(ctx, path)
 }
+
+// GetNVMeController retrieves the NVMe controller for a given NVMe device.
+func (fs *FS) GetNVMeController(device string) (string, error) {
+	return fs.getNVMeController(device)
+}

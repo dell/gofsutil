@@ -743,3 +743,40 @@ func wwnMatches(nguid, wwn string) bool {
 
 	return false
 }
+
+// GetNVMeController retrieves the NVMe controller for a given NVMe device.
+func (fs *FS) getNVMeController(device string) (string, error) {
+	devicePath := filepath.Join(fs.SysBlockDir, device)
+
+	// Check if the device path exists
+	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("device %s does not exist", device)
+	}
+
+	// Resolve the symlink to find the actual path in /sys/device e.g. /sys/devices/virtual/nvme-fabrics/ctl/nvme0/nvme0n1
+	realPath, err := filepath.EvalSymlinks(devicePath)
+	if err != nil {
+		return "", fmt.Errorf("error resolving symlink for %s: %v", device, err)
+	}
+
+	isNvmeController := false
+	// Split the path and look for the controller in /sys/class/nvme
+	pathParts := strings.Split(realPath, "/")
+	for i, part := range pathParts {
+		if strings.Contains(part, "ctl") {
+			isNvmeController = true
+		} else if isNvmeController && part == device {
+			// The controller is the part right before the device name
+			if i > 0 && strings.HasPrefix(pathParts[i-1], "nvme") {
+				return pathParts[i-1], nil
+			}
+		}
+	}
+
+	if !isNvmeController {
+		log.Infof("Not a valid nvme controller device: %s ", device)
+		return "", nil
+	}
+
+	return "", fmt.Errorf("controller not found for device %s", device)
+}
