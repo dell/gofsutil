@@ -40,6 +40,8 @@ var (
 	GOFSRescanCallback func(scan string)
 	// GOFSMockMountInfo contains mount information for filesystem volumes
 	GOFSMockMountInfo *DeviceMountInfo
+	// GONVMEDevice is the name of the NVM Express device
+	GONVMEControllerDevice string
 
 	// GOFSMock allows you to induce errors in the various routine.
 	GOFSMock struct {
@@ -66,6 +68,7 @@ var (
 		InduceResizeFSError               bool
 		InduceGetMpathNameFromDeviceError bool
 		InduceFilesystemInfoError         bool
+		InduceNVMEDeviceError             bool
 	}
 )
 
@@ -543,4 +546,17 @@ func (fs *mockfs) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN st
 		}
 	}
 	return result, nil
+}
+
+// GetNVMeController retrieves the NVMe controller for a given NVMe device.
+func (fs *mockfs) GetNVMeController(device string) (string, error) {
+	return fs.getNVMeController(device)
+}
+
+func (fs *mockfs) getNVMeController(device string) (string, error) {
+	nvmeControllerDevice := GONVMEControllerDevice
+	if GOFSMock.InduceNVMEDeviceError {
+		return "", errors.New("induced error")
+	}
+	return nvmeControllerDevice, nil
 }
