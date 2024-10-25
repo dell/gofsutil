@@ -38,6 +38,13 @@ import (
 // The 'options' parameter is a list of options. Please see mount(8) for
 // more information. If no options are required then please invoke Mount
 // with an empty or nil argument.
+
+// PowerMaxOUIPrefix - PowerMax format 6 OUI prefix
+var PowerMaxOUIPrefix = "6000097"
+
+// PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
+var PowerStoreOUIPrefix = "68ccf09"
+
 func (fs *FS) mount(
 	ctx context.Context,
 	source, target, fsType string,
@@ -708,11 +715,6 @@ func wwnMatches(nguid, wwn string) bool {
 			nguid: wwn[last16] 		+ wwn[1:6] 	+ wwn[0] + wwn[7:15]
 				   1263533030313434 + 000097 	+ 6		 + 000012000
 	*/
-	// PowerMaxOUIPrefix - PowerMax format 6 OUI prefix
-	PowerMaxOUIPrefix := "6000097"
-
-	// PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
-	PowerStoreOUIPrefix := "68ccf09"
 	if len(wwn) < 32 {
 		return false
 	}

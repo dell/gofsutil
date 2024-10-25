@@ -624,6 +624,11 @@ func (fs *FS) deviceRescan(_ context.Context,
 	var device string
 	if strings.Contains(devicePath, "nvme") {
 		device = path + "/device/rescan_controller"
+		_, err := os.Stat(device)
+		if os.IsNotExist(err) {
+			log.Warnf("This is not a valid nvme controller device %s", device)
+			return nil
+		}
 	} else {
 		device = path + "/device/rescan"
 	}
