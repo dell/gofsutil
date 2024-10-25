@@ -40,7 +40,7 @@ var (
 	GOFSRescanCallback func(scan string)
 	// GOFSMockMountInfo contains mount information for filesystem volumes
 	GOFSMockMountInfo *DeviceMountInfo
-	// GONVMEDevice is the name of the NVM Express device
+	// GONVMEControllerDevice is the name of the NVM Express device
 	GONVMEControllerDevice string
 
 	// GOFSMock allows you to induce errors in the various routine.
