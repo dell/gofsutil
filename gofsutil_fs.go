@@ -23,6 +23,8 @@ import (
 type FS struct {
 	// ScanEntry is the function used to process mount table entries.
 	ScanEntry EntryScanFunc
+	// SysBlockDir is used to set the directory of block devices.
+	SysBlockDir string
 }
 
 // GetDiskFormat uses 'lsblk' to see if the given disk is unformatted.
@@ -237,4 +239,9 @@ func (fs *FS) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN stri
 // FsInfo given the path of the filesystem will return its stats
 func (fs *FS) FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.fsInfo(ctx, path)
+}
+
+// GetNVMeController retrieves the NVMe controller for a given NVMe device.
+func (fs *FS) GetNVMeController(device string) (string, error) {
+	return fs.getNVMeController(device)
 }

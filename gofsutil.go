@@ -47,6 +47,7 @@ type FSinterface interface {
 	findFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	getMpathNameFromDevice(ctx context.Context, device string) (string, error)
 	fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
+	getNVMeController(device string) (string, error)
 
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
@@ -73,6 +74,7 @@ type FSinterface interface {
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	GetMpathNameFromDevice(ctx context.Context, device string) (string, error)
 	FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
+	GetNVMeController(device string) (string, error)
 }
 
 // MultipathDevDiskByIDPrefix is a pathname prefix for items located in /dev/disk/by-id
@@ -84,7 +86,7 @@ var (
 	ErrNotImplemented = errors.New("not implemented")
 
 	// fs is the default FS instance.
-	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
+	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc, SysBlockDir: "/sys/block"}
 )
 
 // ContextKey is a variable containing context-keys
@@ -98,6 +100,11 @@ const NoDiscard = "NoDiscard"
 // for calls using gofsutils.
 func UseMockFS() {
 	fs = &mockfs{ScanEntry: defaultEntryScanFunc}
+}
+
+// UseMockSysBlockDir creates a file system for testing.
+func UseMockSysBlockDir(mockSysBlockDir string) {
+	fs = &FS{ScanEntry: defaultEntryScanFunc, SysBlockDir: mockSysBlockDir}
 }
 
 // GetDiskFormat uses 'lsblk' to see if the given disk is unformatted.
@@ -295,4 +302,9 @@ func GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]st
 // FsInfo given the path of the filesystem will return its stats
 func FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
 	return fs.fsInfo(ctx, path)
+}
+
+// GetNVMeController retrieves the NVMe controller for a given NVMe device.
+func GetNVMeController(device string) (string, error) {
+	return fs.getNVMeController(device)
 }

@@ -40,6 +40,10 @@ var (
 	GOFSRescanCallback func(scan string)
 	// GOFSMockMountInfo contains mount information for filesystem volumes
 	GOFSMockMountInfo *DeviceMountInfo
+	// GONVMEDeviceToControllerMap has device to controller mapping
+	GONVMEDeviceToControllerMap map[string]string
+	// GONVMEValidDevices mocks existing devices
+	GONVMEValidDevices map[string]bool
 
 	// GOFSMock allows you to induce errors in the various routine.
 	GOFSMock struct {
@@ -66,6 +70,7 @@ var (
 		InduceResizeFSError               bool
 		InduceGetMpathNameFromDeviceError bool
 		InduceFilesystemInfoError         bool
+		InduceGetNVMeControllerError      bool
 	}
 )
 
@@ -543,4 +548,22 @@ func (fs *mockfs) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN st
 		}
 	}
 	return result, nil
+}
+
+// GetNVMeController retrieves the NVMe controller for a given NVMe device.
+func (fs *mockfs) GetNVMeController(device string) (string, error) {
+	return fs.getNVMeController(device)
+}
+
+func (fs *mockfs) getNVMeController(device string) (string, error) {
+	if GOFSMock.InduceGetNVMeControllerError {
+		return "", errors.New("induced error")
+	}
+	if _, exists := GONVMEValidDevices[device]; !exists {
+		return "", fmt.Errorf("device %s does not exist", device)
+	}
+	if controller, found := GONVMEDeviceToControllerMap[device]; found {
+		return controller, nil
+	}
+	return "", fmt.Errorf("controller not found for device %s", device)
 }
