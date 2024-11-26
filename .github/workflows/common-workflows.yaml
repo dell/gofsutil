@@ -15,3 +15,8 @@ jobs:
   common:
     name: Quality Checks
     uses: dell/common-github-actions/.github/workflows/go-common.yml@main
+
+  check-license-header:
+    name: Check License Header
+    uses: dell/common-github-actions/.github/workflows/check-license-header.yaml@feature/license-validation
+  
