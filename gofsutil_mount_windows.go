@@ -12,6 +12,7 @@
 
 package gofsutil
 
+// test package
 import (
 	"context"
 	"errors"
