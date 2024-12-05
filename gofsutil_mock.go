@@ -204,7 +204,7 @@ func (fs *mockfs) FsInfo(ctx context.Context, path string) (int64, int64, int64,
 
 func (fs *mockfs) fsInfo(_ context.Context, _ string) (int64, int64, int64, int64, int64, int64, error) {
 	if GOFSMock.InduceFilesystemInfoError {
-		return 0, 0, 0, 0, 0, 0, errors.New("filesystemInfo induced error: Failed to get fileystem stats")
+		return 0, 0, 0, 0, 0, 0, errors.New("filesystemInfo induced error: Failed to get filesystem stats")
 	}
 	return 1000, 2000, 1000, 4, 2, 2, nil
 }
