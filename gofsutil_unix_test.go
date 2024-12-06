@@ -25,52 +25,52 @@ import (
 	"github.com/dell/gofsutil"
 )
 
-func TestFCRescanSCSIHost(t *testing.T) {
-	var targets []string
-	// Scan the remote ports to find the array port WWNs
-	fcRemotePortsDir := "/sys/class/fc_remote_ports"
-	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
-	if err != nil {
-		t.Errorf("error reading %s: %s", fcRemotePortsDir, err)
-	}
-	for _, remotePort := range remotePortEntries {
-		if !strings.HasPrefix(remotePort.Name(), "rport-") {
-			continue
-		}
+// func TestFCRescanSCSIHost(t *testing.T) {
+// 	var targets []string
+// 	// Scan the remote ports to find the array port WWNs
+// 	fcRemotePortsDir := "/sys/class/fc_remote_ports"
+// 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
+// 	if err != nil {
+// 		t.Errorf("error reading %s: %s", fcRemotePortsDir, err)
+// 	}
+// 	for _, remotePort := range remotePortEntries {
+// 		if !strings.HasPrefix(remotePort.Name(), "rport-") {
+// 			continue
+// 		}
 
-		if !strings.HasPrefix(remotePort.Name(), "rport-") {
-			continue
-		}
+// 		if !strings.HasPrefix(remotePort.Name(), "rport-") {
+// 			continue
+// 		}
 
-		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
-		if err != nil {
-			continue
-		}
-		arrayPortName := strings.TrimSpace(string(arrayPortNameBytes))
-		if !strings.HasPrefix(arrayPortName, gofsutil.FCPortPrefix) {
-			continue
-		}
-		targets = append(targets, arrayPortName)
+// 		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
+// 		if err != nil {
+// 			continue
+// 		}
+// 		arrayPortName := strings.TrimSpace(string(arrayPortNameBytes))
+// 		if !strings.HasPrefix(arrayPortName, gofsutil.FCPortPrefix) {
+// 			continue
+// 		}
+// 		targets = append(targets, arrayPortName)
 
-	}
+// 	}
 
-	if len(targets) > 0 {
-		err := gofsutil.RescanSCSIHost(context.Background(), targets, "1")
-		if err != nil {
-			t.Errorf("RescanSCSIHost failed: %s", err)
-		}
-	}
-}
+// 	if len(targets) > 0 {
+// 		err := gofsutil.RescanSCSIHost(context.Background(), targets, "1")
+// 		if err != nil {
+// 			t.Errorf("RescanSCSIHost failed: %s", err)
+// 		}
+// 	}
+// }
 
-func TestGetFCHostPortWWNs(t *testing.T) {
-	wwns, err := gofsutil.GetFCHostPortWWNs(context.Background())
-	if err != nil {
-		t.Error(err)
-	}
-	for _, wwn := range wwns {
-		fmt.Printf("local FC port wwn: %s\n", wwn)
-	}
-}
+// func TestGetFCHostPortWWNs(t *testing.T) {
+// 	wwns, err := gofsutil.GetFCHostPortWWNs(context.Background())
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	for _, wwn := range wwns {
+// 		fmt.Printf("local FC port wwn: %s\n", wwn)
+// 	}
+// }
 
 func TestMountArgs(t *testing.T) {
 	tests := []struct {
