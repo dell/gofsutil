@@ -19,10 +19,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
+	"errors"
 	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"syscall"
 )
 
 func TestBindMount(t *testing.T) {
@@ -215,3 +216,140 @@ func TestGetNVMeController(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDevMounts(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		dev       string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid dev",
+			dev:       "abc",
+			expectErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := gofsutil.GetDevMounts(tt.ctx, tt.dev)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestValidateDevice(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		source    string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid dev",
+			source:    "/dev",
+			expectErr: errors.New("invalid device: /dev"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := gofsutil.ValidateDevice(tt.ctx, tt.source)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestTargetIPLUNToDevicePath(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		targetIP  string
+		lunID     int
+		expectErr error
+	}{
+		{
+			testname:  "Invalid lunid",
+			targetIP:  "10.0.0.100",
+			lunID:     1234,
+			expectErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := gofsutil.TargetIPLUNToDevicePath(tt.ctx, tt.targetIP, tt.lunID)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestRescanSCSIHost(t *testing.T) {
+
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		targets   []string
+		lun       string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid targets",
+			targets:   []string{"a", "b"},
+			lun:       "1234",
+			expectErr: nil,
+		},
+		{
+			testname:  "Targets",
+			targets:   []string{"iqn.2016-06.io.k8s", "iqn.2017-06.io.k8s","0x500000"},
+			lun:       "",
+			expectErr: &os.PathError{
+				Op:   "open",                     // Operation that caused the error
+				Path: "/sys/class/iscsi_session", // Path where the error occurred
+				Err:  syscall.ENOENT,             // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			err := gofsutil.RescanSCSIHost(tt.ctx, tt.targets, tt.lun)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestRemoveBlockDevice(t *testing.T) {
+	tests := []struct {
+		testname        string
+		ctx             context.Context
+		blockDevicePath string
+		expectErr       error
+	}{
+		{
+			testname:        "Invalid Block device path",
+			blockDevicePath: "/abc",
+			expectErr:       errors.New("Cannot read /sys/block/abc/device/state: open /sys/block/abc/device/state: no such file or directory"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			err := gofsutil.RemoveBlockDevice(tt.ctx, tt.blockDevicePath)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestGetFCHostPortWWNs(t *testing.T) {
+	expectErr := &os.PathError{
+		Op:   "open",               // Operation that caused the error
+		Path: "/sys/class/fc_host", // Path where the error occurred
+		Err:  syscall.ENOENT,       // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
+	}
+	_, err := gofsutil.GetFCHostPortWWNs(context.Background())
+	assert.Equal(t, expectErr, err)
+}
+
+func TestIssueLIPToAllFCHosts(t *testing.T) {
+	err := gofsutil.IssueLIPToAllFCHosts(context.Background())
+	assert.Equal(t, nil, err)
+}
+
