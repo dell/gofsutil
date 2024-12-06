@@ -21,6 +21,7 @@ import (
 	"os"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -186,32 +187,35 @@ func TestGetIscsiTargetHosts(t *testing.T) {
 	}
 }
 
-// func TestMultipathCommand(t *testing.T) {
-
-// 	tests := []struct {
-// 		testname       string
-// 		ctx			   context.Context
-// 		timeoutSeconds time.Duration
-// 		chroot 		   string
-// 		arguments	   []string
-// 		expectErr	   error
-// 	}{
-// 		{
-// 			testname:       "Invalid Block device path",
-// 			timeoutSeconds:	time.Duration(10),
-// 			chroot:         "",
-// 			arguments:		[]string{"-A", "-iR",},
-// 			expectErr:		errors.New("Ca"),
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.testname, func(t *testing.T) {
-// 			fs := FS{SysBlockDir: "string"}
-// 			_,err := fs.multipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments)
-// 			assert.Equal(t, tt.expectErr, err)
-// 		})
-// 	}
-// }
+func TestMultipathCommand(t *testing.T) {
+	tests := []struct {
+		testname       string
+		ctx            context.Context
+		timeoutSeconds time.Duration
+		chroot         string
+		arguments      []string
+		expectErr      error
+	}{
+		{
+			testname:       "Empty chroot",
+			timeoutSeconds: time.Duration(10),
+			chroot:         "",
+			arguments:      []string{"A", "iR"},
+			expectErr: &os.PathError{
+				Op:   "fork/exec",
+				Path: "/usr/sbin/multipath",
+				Err:  syscall.ENOENT,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{SysBlockDir: "string"}
+			_, err := fs.multipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments...)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
 
 func TestIsBind(t *testing.T) {
 	tests := []struct {
