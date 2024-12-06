@@ -89,6 +89,15 @@ func TestDoMount(t *testing.T) {
 			opts:     []string{"a", "b"},
 			expect:   errors.New("Path: / is invalid"),
 		},
+		{
+			testname: "Valid mount command",
+			mntCmnd:  "mount",
+			source:   "dev",
+			target:   "usr",
+			fstype:   "ext4",
+			opts:     []string{"key=value", "variable"},
+			expect:   errors.New("mount failed: exit status 32\nmounting arguments: -t ext4 -o key=value,variable dev usr\noutput: mount: usr: mount point does not exist.\n"),
+		},
 	}
 
 	for _, tt := range tests {
