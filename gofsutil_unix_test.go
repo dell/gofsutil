@@ -17,7 +17,7 @@ package gofsutil_test
 
 import (
 	"context"
-	"fmt"
+	// "fmt"
 	"os"
 	"strings"
 	"testing"
