@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gofsutil_test
+package gofsutil
 
 import (
 	"context"
@@ -21,8 +21,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/dell/gofsutil"
 )
 
 // func TestFCRescanSCSIHost(t *testing.T) {
@@ -117,7 +115,7 @@ func TestMountArgs(t *testing.T) {
 		tt := tt
 		t.Run("", func(st *testing.T) {
 			st.Parallel()
-			opts := gofsutil.MakeMountArgs(
+			opts := MakeMountArgs(
 				context.TODO(), tt.src, tt.tgt, tt.fst, tt.opts...)
 			optsStr := strings.Join(opts, " ")
 			if optsStr != tt.result {
@@ -174,7 +172,7 @@ func TestWWNToDevicePath(t *testing.T) {
 				t.Errorf("Couldn't create Symlink %s: %s", tt.tgt, err)
 			}
 			// Get the entry
-			a, b, err := gofsutil.WWNToDevicePathX(context.Background(), tt.wwn)
+			a, b, err := WWNToDevicePathX(context.Background(), tt.wwn)
 			if err != nil {
 				t.Errorf("Couldn't find DevicePathX: %s", err)
 			}
@@ -185,7 +183,7 @@ func TestWWNToDevicePath(t *testing.T) {
 				t.Errorf("Expected %s got %s", tt.result, b)
 			}
 			// Get the entry
-			c, err := gofsutil.WWNToDevicePath(context.Background(), tt.wwn)
+			c, err := WWNToDevicePath(context.Background(), tt.wwn)
 			if err != nil {
 				t.Errorf("Couldn't find DevicePathX: %s", err)
 			}
