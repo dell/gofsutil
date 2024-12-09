@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
+	"strings"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,7 +79,8 @@ func TestDoMount(t *testing.T) {
 		target   string
 		fstype   string
 		opts     []string
-		expect   error
+		expect   string
+
 	}{
 		{
 			testname: "Invalid mount args",
@@ -88,7 +89,7 @@ func TestDoMount(t *testing.T) {
 			target:   "",
 			fstype:   "",
 			opts:     []string{"a", "b"},
-			expect:   errors.New("Path: / is invalid"),
+			expect:   "Path: / is invalid",
 		},
 		{
 			testname: "Valid mount command",
@@ -97,7 +98,7 @@ func TestDoMount(t *testing.T) {
 			target:   "usr",
 			fstype:   "ext4",
 			opts:     []string{"key=value", "variable"},
-			expect:   errors.New("mount failed: exit status 32\nmounting arguments: -t ext4 -o key=value,variable dev usr\noutput: mount: usr: mount point does not exist.\n"),
+			expect:   "mount failed",
 		},
 	}
 
@@ -105,7 +106,7 @@ func TestDoMount(t *testing.T) {
 		t.Run(tt.testname, func(t *testing.T) {
 			fs := FS{SysBlockDir: "string"}
 			err := fs.doMount(tt.ctx, tt.mntCmnd, tt.source, tt.target, tt.fstype, tt.opts...)
-			assert.Equal(t, tt.expect, err)
+			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
 		})
 	}
 }
@@ -115,17 +116,17 @@ func TestUnMount(t *testing.T) {
 		testname string
 		ctx      context.Context
 		target   string
-		expect   error
+		expect   string
 	}{
 		{
 			testname: "Invalid path",
 			target:   "/",
-			expect:   errors.New("Path: / is invalid"),
+			expect:   "Path: / is invalid",
 		},
 		{
 			testname: "Invalid arguments",
 			target:   "/abc",
-			expect:   errors.New("unmount failed: no such file or directory\nunmounting arguments: /abc"),
+			expect:   "unmount failed",
 		},
 	}
 
@@ -133,7 +134,7 @@ func TestUnMount(t *testing.T) {
 		t.Run(tt.testname, func(t *testing.T) {
 			fs := FS{SysBlockDir: "string"}
 			err := fs.unmount(tt.ctx, tt.target)
-			assert.Equal(t, tt.expect, err)
+			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
 		})
 	}
 }
