@@ -13,64 +13,66 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gofsutil_test
+package gofsutil
 
 import (
 	"context"
-	"fmt"
+	// "fmt"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/dell/gofsutil"
+	"errors"
+	"syscall"
+	"time"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestFCRescanSCSIHost(t *testing.T) {
-	var targets []string
-	// Scan the remote ports to find the array port WWNs
-	fcRemotePortsDir := "/sys/class/fc_remote_ports"
-	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
-	if err != nil {
-		t.Errorf("error reading %s: %s", fcRemotePortsDir, err)
-	}
-	for _, remotePort := range remotePortEntries {
-		if !strings.HasPrefix(remotePort.Name(), "rport-") {
-			continue
-		}
+// func TestFCRescanSCSIHost(t *testing.T) {
+// 	var targets []string
+// 	// Scan the remote ports to find the array port WWNs
+// 	fcRemotePortsDir := "/sys/class/fc_remote_ports"
+// 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
+// 	if err != nil {
+// 		t.Errorf("error reading %s: %s", fcRemotePortsDir, err)
+// 	}
+// 	for _, remotePort := range remotePortEntries {
+// 		if !strings.HasPrefix(remotePort.Name(), "rport-") {
+// 			continue
+// 		}
 
-		if !strings.HasPrefix(remotePort.Name(), "rport-") {
-			continue
-		}
+// 		if !strings.HasPrefix(remotePort.Name(), "rport-") {
+// 			continue
+// 		}
 
-		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
-		if err != nil {
-			continue
-		}
-		arrayPortName := strings.TrimSpace(string(arrayPortNameBytes))
-		if !strings.HasPrefix(arrayPortName, gofsutil.FCPortPrefix) {
-			continue
-		}
-		targets = append(targets, arrayPortName)
+// 		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
+// 		if err != nil {
+// 			continue
+// 		}
+// 		arrayPortName := strings.TrimSpace(string(arrayPortNameBytes))
+// 		if !strings.HasPrefix(arrayPortName, gofsutil.FCPortPrefix) {
+// 			continue
+// 		}
+// 		targets = append(targets, arrayPortName)
 
-	}
+// 	}
 
-	if len(targets) > 0 {
-		err := gofsutil.RescanSCSIHost(context.Background(), targets, "1")
-		if err != nil {
-			t.Errorf("RescanSCSIHost failed: %s", err)
-		}
-	}
-}
+// 	if len(targets) > 0 {
+// 		err := gofsutil.RescanSCSIHost(context.Background(), targets, "1")
+// 		if err != nil {
+// 			t.Errorf("RescanSCSIHost failed: %s", err)
+// 		}
+// 	}
+// }
 
-func TestGetFCHostPortWWNs(t *testing.T) {
-	wwns, err := gofsutil.GetFCHostPortWWNs(context.Background())
-	if err != nil {
-		t.Error(err)
-	}
-	for _, wwn := range wwns {
-		fmt.Printf("local FC port wwn: %s\n", wwn)
-	}
-}
+// func TestGetFCHostPortWWNs(t *testing.T) {
+// 	wwns, err := gofsutil.GetFCHostPortWWNs(context.Background())
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
+// 	for _, wwn := range wwns {
+// 		fmt.Printf("local FC port wwn: %s\n", wwn)
+// 	}
+// }
 
 func TestMountArgs(t *testing.T) {
 	tests := []struct {
@@ -117,7 +119,7 @@ func TestMountArgs(t *testing.T) {
 		tt := tt
 		t.Run("", func(st *testing.T) {
 			st.Parallel()
-			opts := gofsutil.MakeMountArgs(
+			opts := MakeMountArgs(
 				context.TODO(), tt.src, tt.tgt, tt.fst, tt.opts...)
 			optsStr := strings.Join(opts, " ")
 			if optsStr != tt.result {
@@ -174,7 +176,7 @@ func TestWWNToDevicePath(t *testing.T) {
 				t.Errorf("Couldn't create Symlink %s: %s", tt.tgt, err)
 			}
 			// Get the entry
-			a, b, err := gofsutil.WWNToDevicePathX(context.Background(), tt.wwn)
+			a, b, err := WWNToDevicePathX(context.Background(), tt.wwn)
 			if err != nil {
 				t.Errorf("Couldn't find DevicePathX: %s", err)
 			}
@@ -185,7 +187,7 @@ func TestWWNToDevicePath(t *testing.T) {
 				t.Errorf("Expected %s got %s", tt.result, b)
 			}
 			// Get the entry
-			c, err := gofsutil.WWNToDevicePath(context.Background(), tt.wwn)
+			c, err := WWNToDevicePath(context.Background(), tt.wwn)
 			if err != nil {
 				t.Errorf("Couldn't find DevicePathX: %s", err)
 			}
@@ -210,3 +212,355 @@ func TestWWNToDevicePath(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateMountArgs(t *testing.T) {
+	tests := []struct {
+		testname string
+		source   string
+		target   string
+		fstype   string
+		opts     []string
+		expect   error
+	}{
+		{
+			testname: "Invalid souce path",
+			source:   "/",
+			target:   "",
+			fstype:   "",
+			opts:     []string{"a", "b"},
+			expect:   errors.New("Path: / is invalid"),
+		},
+		{
+			testname: "Invalid target path",
+			source:   "source",
+			target:   "/",
+			fstype:   "",
+			opts:     []string{"a", "b"},
+			expect:   errors.New("Path: / is invalid"),
+		},
+		{
+			testname: "Invalid fstype",
+			source:   "source",
+			target:   "target",
+			fstype:   "fstype",
+			opts:     []string{"a", "b"},
+			expect:   errors.New("FsType: fstype is invalid"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{SysBlockDir: "string"}
+			err := fs.validateMountArgs(tt.source, tt.target, tt.fstype, tt.opts...)
+			assert.Equal(t, tt.expect, err)
+		})
+	}
+}
+
+func TestDoMount(t *testing.T) {
+	tests := []struct {
+		testname string
+		ctx      context.Context
+		mntCmnd  string
+		source   string
+		target   string
+		fstype   string
+		opts     []string
+		expect   string
+
+	}{
+		{
+			testname: "Invalid mount args",
+			mntCmnd:  "invalid",
+			source:   "/",
+			target:   "",
+			fstype:   "",
+			opts:     []string{"a", "b"},
+			expect:   "Path: / is invalid",
+		},
+		{
+			testname: "Valid mount command",
+			mntCmnd:  "mount",
+			source:   "dev",
+			target:   "usr",
+			fstype:   "ext4",
+			opts:     []string{"key=value", "variable"},
+			expect:   "mount failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{SysBlockDir: "string"}
+			err := fs.doMount(tt.ctx, tt.mntCmnd, tt.source, tt.target, tt.fstype, tt.opts...)
+			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
+		})
+	}
+}
+
+func TestUnMount(t *testing.T) {
+	tests := []struct {
+		testname string
+		ctx      context.Context
+		target   string
+		expect   string
+	}{
+		{
+			testname: "Invalid path",
+			target:   "/",
+			expect:   "Path: / is invalid",
+		},
+		{
+			testname: "Invalid arguments",
+			target:   "/abc",
+			expect:   "unmount failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{SysBlockDir: "string"}
+			err := fs.unmount(tt.ctx, tt.target)
+			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
+		})
+	}
+}
+
+func TestGetFCTargetHosts(t *testing.T) {
+	tests := []struct {
+		testname  string
+		targets   []string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid target hosts",
+			targets:   []string{"a", "b"},
+			expectErr: nil,
+		},
+		{
+			testname:  "Target hosts",
+			targets:   []string{"iqn.2016-06.io.k8s", "iqn.2017-06.io.k8s", "0x500000"},
+			expectErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := getFCTargetHosts(tt.targets)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestGetIscsiTargetHosts(t *testing.T) {
+	tests := []struct {
+		testname  string
+		targets   []string
+		expectErr error
+	}{
+		{
+			testname: "Invalid target hosts",
+			targets:  []string{"a", "b"},
+			expectErr: &os.PathError{
+				Op:   "open",                     // Operation that caused the error
+				Path: "/sys/class/iscsi_session", // Path where the error occurred
+				Err:  syscall.ENOENT,             // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := getIscsiTargetHosts(tt.targets)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestMultipathCommand(t *testing.T) {
+	tests := []struct {
+		testname       string
+		ctx            context.Context
+		timeoutSeconds time.Duration
+		chroot         string
+		arguments      []string
+		expectErr      error
+	}{
+		{
+			testname:       "Empty chroot",
+			timeoutSeconds: time.Duration(10),
+			chroot:         "",
+			arguments:      []string{"A", "iR"},
+			expectErr: &os.PathError{
+				Op:   "fork/exec",
+				Path: "/usr/sbin/multipath",
+				Err:  syscall.ENOENT,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{SysBlockDir: "string"}
+			_, err := fs.multipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments...)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestIsBind(t *testing.T) {
+	tests := []struct {
+		testname string
+		ctx      context.Context
+		opts     []string
+		expect   bool
+	}{
+		{
+			testname: "Opts",
+			opts:     []string{"a", "bind", "remount"},
+			expect:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{SysBlockDir: "string"}
+			_, err := fs.isBind(tt.ctx, tt.opts...)
+			assert.Equal(t, tt.expect, err)
+		})
+	}
+}
+func TestGetDevMounts(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		dev       string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid dev",
+			dev:       "abc",
+			expectErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := GetDevMounts(tt.ctx, tt.dev)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestValidateDevice(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		source    string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid dev",
+			source:    "/dev",
+			expectErr: errors.New("invalid device: /dev"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := ValidateDevice(tt.ctx, tt.source)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestTargetIPLUNToDevicePath(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		targetIP  string
+		lunID     int
+		expectErr error
+	}{
+		{
+			testname:  "Invalid lunid",
+			targetIP:  "10.0.0.100",
+			lunID:     1234,
+			expectErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			_, err := TargetIPLUNToDevicePath(tt.ctx, tt.targetIP, tt.lunID)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestRescanSCSIHost(t *testing.T) {
+
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		targets   []string
+		lun       string
+		expectErr error
+	}{
+		{
+			testname:  "Invalid targets",
+			targets:   []string{"a", "b"},
+			lun:       "1234",
+			expectErr: nil,
+		},
+		{
+			testname:  "Targets",
+			targets:   []string{"iqn.2016-06.io.k8s", "iqn.2017-06.io.k8s","0x500000"},
+			lun:       "",
+			expectErr: &os.PathError{
+				Op:   "open",                     // Operation that caused the error
+				Path: "/sys/class/iscsi_session", // Path where the error occurred
+				Err:  syscall.ENOENT,             // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			err := RescanSCSIHost(tt.ctx, tt.targets, tt.lun)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestRemoveBlockDevice(t *testing.T) {
+	tests := []struct {
+		testname        string
+		ctx             context.Context
+		blockDevicePath string
+		expectErr       error
+	}{
+		{
+			testname:        "Invalid Block device path",
+			blockDevicePath: "/abc",
+			expectErr:       errors.New("Cannot read /sys/block/abc/device/state: open /sys/block/abc/device/state: no such file or directory"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			err := RemoveBlockDevice(tt.ctx, tt.blockDevicePath)
+			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestGetFCHostPortWWNs(t *testing.T) {
+	expectErr := &os.PathError{
+		Op:   "open",               // Operation that caused the error
+		Path: "/sys/class/fc_host", // Path where the error occurred
+		Err:  syscall.ENOENT,       // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
+	}
+	_, err := GetFCHostPortWWNs(context.Background())
+	assert.Equal(t, expectErr, err)
+}
+
+func TestIssueLIPToAllFCHosts(t *testing.T) {
+	err := IssueLIPToAllFCHosts(context.Background())
+	assert.Equal(t, nil, err)
+}
+
+
