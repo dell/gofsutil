@@ -162,7 +162,7 @@ func TestFSGetMounts(t *testing.T) {
 				mounts []Info
 				err    error
 			}{
-				mounts: []Info{},
+				mounts: nil,
 				err:    nil,
 			},
 		},
