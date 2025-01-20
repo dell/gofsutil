@@ -224,7 +224,19 @@ func (fs *mockfs) getMounts(_ context.Context) ([]Info, error) {
 	if GOFSMock.InduceGetMountsError {
 		return GOFSMockMounts, errors.New("getMounts induced error")
 	}
-	return GOFSMockMounts, nil
+	var mockMounts = []Info{
+		{
+			Path: "/mnt/volume1",
+			Type: "ext4",
+			Opts: []string{"rw", "relatime"},
+		},
+		{
+			Path: "/mnt/volume2",
+			Type: "xfs",
+			Opts: []string{"rw", "noexec"},
+		},
+	}
+	return append(GOFSMockMounts, mockMounts...), nil
 }
 
 func (fs *mockfs) readProcMounts(_ context.Context,

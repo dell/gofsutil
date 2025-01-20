@@ -102,7 +102,7 @@ func TestFsInfo(t *testing.T) {
 	}
 }
 
-func TestDeviceRescan(t *testing.T) {
+func TestFSDeviceRescan(t *testing.T) {
 	tests := []struct {
 		testname   string
 		ctx        context.Context
@@ -162,8 +162,19 @@ func TestFSGetMounts(t *testing.T) {
 				mounts []Info
 				err    error
 			}{
-				mounts: nil,
-				err:    nil,
+				mounts: []Info{
+					{
+						Path: "/mnt/volume1",
+						Type: "ext4",
+						Opts: []string{"rw", "relatime"},
+					},
+					{
+						Path: "/mnt/volume2",
+						Type: "xfs",
+						Opts: []string{"rw", "noexec"},
+					},
+				},
+				err: nil,
 			},
 		},
 		{
