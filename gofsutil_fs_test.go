@@ -101,3 +101,92 @@ func TestFsInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestDeviceRescan(t *testing.T) {
+	tests := []struct {
+		testname   string
+		ctx        context.Context
+		devicePath string
+		induceErr  bool
+		expected   struct {
+			err error
+		}
+	}{
+		{
+			testname:   "Normal operation",
+			devicePath: "/dev/sda",
+			induceErr:  false,
+			expected: struct {
+				err error
+			}{
+				err: nil,
+			},
+		},
+		{
+			testname:   "Induced error",
+			devicePath: "/dev/sda",
+			induceErr:  true,
+			expected: struct {
+				err error
+			}{
+				err: errors.New("DeviceRescan induced error: Failed to rescan device"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceDeviceRescanError = tt.induceErr
+			err := fs.DeviceRescan(tt.ctx, tt.devicePath)
+
+			assert.Equal(t, tt.expected.err, err)
+		})
+	}
+}
+
+func TestFSGetMounts(t *testing.T) {
+	tests := []struct {
+		testname  string
+		ctx       context.Context
+		induceErr bool
+		expected  struct {
+			mounts []Info
+			err    error
+		}
+	}{
+		{
+			testname:  "Normal operation",
+			induceErr: false,
+			expected: struct {
+				mounts []Info
+				err    error
+			}{
+				mounts: []Info{},
+				err:    nil,
+			},
+		},
+		{
+			testname:  "Induced error",
+			induceErr: true,
+			expected: struct {
+				mounts []Info
+				err    error
+			}{
+				mounts: nil,
+				err:    errors.New("getMounts induced error"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceGetMountsError = tt.induceErr
+			mounts, err := fs.GetMounts(tt.ctx)
+
+			assert.Equal(t, tt.expected.err, err)
+			assert.Equal(t, tt.expected.mounts, mounts)
+		})
+	}
+}
