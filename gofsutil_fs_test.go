@@ -89,7 +89,7 @@ func TestFsInfo(t *testing.T) {
 		t.Run(tt.testname, func(t *testing.T) {
 			fs := &mockfs{}
 			GOFSMock.InduceFilesystemInfoError = tt.induceErr
-			available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.fsInfo(tt.ctx, tt.path)
+			available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.FsInfo(tt.ctx, tt.path)
 
 			assert.Equal(t, tt.expected.available, available)
 			assert.Equal(t, tt.expected.capacity, capacity)
@@ -289,6 +289,124 @@ func TestFSWWNToDevicePath(t *testing.T) {
 			assert.Equal(t, tt.expectedErr, err)
 			assert.Equal(t, tt.expectedDev, dev)
 			assert.Equal(t, tt.expectedPath, path)
+		})
+	}
+}
+
+func TestFSGetDiskFormat(t *testing.T) {
+	tests := []struct {
+		testname     string
+		ctx          context.Context
+		disk         string
+		induceErr    bool
+		induceType   string
+		expectedType string
+		expectedErr  error
+	}{
+		{
+			testname:     "Normal operation",
+			disk:         "/dev/sda",
+			induceErr:    false,
+			induceType:   "",
+			expectedType: "ext4",
+			expectedErr:  nil,
+		},
+		{
+			testname:     "Induced error",
+			disk:         "/dev/sda",
+			induceErr:    true,
+			induceType:   "",
+			expectedType: "",
+			expectedErr:  errors.New("getDiskFormat induced error"),
+		},
+		{
+			testname:     "Induced type",
+			disk:         "/dev/sda",
+			induceErr:    false,
+			induceType:   "xfs",
+			expectedType: "xfs",
+			expectedErr:  nil,
+		},
+		{
+			testname:     "Disk not found",
+			disk:         "/dev/sdb",
+			induceErr:    false,
+			induceType:   "",
+			expectedType: "",
+			expectedErr:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceGetDiskFormatError = tt.induceErr
+			GOFSMock.InduceGetDiskFormatType = tt.induceType
+			GOFSMockMounts = []Info{
+				{
+					Device: "/dev/sda",
+					Type:   "ext4",
+				},
+			}
+
+			format, err := fs.GetDiskFormat(tt.ctx, tt.disk)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedType, format)
+		})
+	}
+}
+
+func TestFSMount(t *testing.T) {
+	tests := []struct {
+		testname       string
+		ctx            context.Context
+		source         string
+		target         string
+		fsType         string
+		options        []string
+		induceErr      bool
+		expectedErr    error
+		expectedMounts []Info
+	}{
+		{
+			testname:    "Normal operation",
+			source:      "/dev/sda1",
+			target:      "/mnt/volume1",
+			fsType:      "ext4",
+			options:     []string{"rw", "relatime"},
+			induceErr:   false,
+			expectedErr: nil,
+			expectedMounts: []Info{
+				{
+					Device: "/dev/sda1",
+					Path:   "/mnt/volume1",
+					Opts:   []string{"rw", "relatime"},
+				},
+			},
+		},
+		{
+			testname:       "Induced error",
+			source:         "/dev/sda1",
+			target:         "/mnt/volume1",
+			fsType:         "ext4",
+			options:        []string{"rw", "relatime"},
+			induceErr:      true,
+			expectedErr:    errors.New("mount induced error"),
+			expectedMounts: []Info{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceMountError = tt.induceErr
+			GOFSMockMounts = []Info{}
+
+			err := fs.Mount(tt.ctx, tt.source, tt.target, tt.fsType, tt.options...)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedMounts, GOFSMockMounts)
 		})
 	}
 }
