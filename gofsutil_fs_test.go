@@ -194,10 +194,101 @@ func TestFSGetMounts(t *testing.T) {
 		t.Run(tt.testname, func(t *testing.T) {
 			fs := &mockfs{}
 			GOFSMock.InduceGetMountsError = tt.induceErr
+			GOFSMockMounts = []Info{
+				{
+					Path: "/mnt/volume1",
+					Type: "ext4",
+					Opts: []string{"rw", "relatime"},
+				},
+				{
+					Path: "/mnt/volume2",
+					Type: "xfs",
+					Opts: []string{"rw", "noexec"},
+				},
+			}
+
 			mounts, err := fs.GetMounts(tt.ctx)
 
 			assert.Equal(t, tt.expected.err, err)
 			assert.Equal(t, tt.expected.mounts, mounts)
+		})
+	}
+}
+
+func TestFSRemoveBlockDevice(t *testing.T) {
+	tests := []struct {
+		testname        string
+		ctx             context.Context
+		blockDevicePath string
+		induceErr       bool
+		expectedErr     error
+	}{
+		{
+			testname:        "Normal operation",
+			blockDevicePath: "/dev/sda1",
+			induceErr:       false,
+			expectedErr:     nil,
+		},
+		{
+			testname:        "Induced error",
+			blockDevicePath: "/dev/sda1",
+			induceErr:       true,
+			expectedErr:     errors.New("remove block device induced error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceRemoveBlockDeviceError = tt.induceErr
+			err := fs.RemoveBlockDevice(tt.ctx, tt.blockDevicePath)
+
+			assert.Equal(t, tt.expectedErr, err)
+		})
+	}
+}
+
+func TestFSWWNToDevicePath(t *testing.T) {
+	tests := []struct {
+		testname     string
+		ctx          context.Context
+		wwn          string
+		induceErr    bool
+		expectedDev  string
+		expectedPath string
+		expectedErr  error
+	}{
+		{
+			testname:     "Normal operation",
+			wwn:          "wwn-0x5000c500a0b1c2d3",
+			induceErr:    false,
+			expectedDev:  "/dev/sda/wwn-0x5000c500a0b1c2d3",
+			expectedPath: "/dev/sda",
+			expectedErr:  nil,
+		},
+		{
+			testname:     "Induced error",
+			wwn:          "wwn-0x5000c500a0b1c2d3",
+			induceErr:    true,
+			expectedDev:  "",
+			expectedPath: "",
+			expectedErr:  errors.New("induced error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceWWNToDevicePathError = tt.induceErr
+			GOFSMockWWNToDevice = map[string]string{
+				"wwn-0x5000c500a0b1c2d3": "/dev/sda",
+			}
+			GOFSWWNPath = "/dev/sda/"
+			dev, path, err := fs.WWNToDevicePath(tt.ctx, tt.wwn)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedDev, dev)
+			assert.Equal(t, tt.expectedPath, path)
 		})
 	}
 }

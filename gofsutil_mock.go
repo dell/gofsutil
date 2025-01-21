@@ -222,21 +222,9 @@ func (fs *mockfs) resizeMultipath(_ context.Context, _ string) error {
 
 func (fs *mockfs) getMounts(_ context.Context) ([]Info, error) {
 	if GOFSMock.InduceGetMountsError {
-		return GOFSMockMounts, errors.New("getMounts induced error")
+		return nil, errors.New("getMounts induced error")
 	}
-	var mockMounts = []Info{
-		{
-			Path: "/mnt/volume1",
-			Type: "ext4",
-			Opts: []string{"rw", "relatime"},
-		},
-		{
-			Path: "/mnt/volume2",
-			Type: "xfs",
-			Opts: []string{"rw", "noexec"},
-		},
-	}
-	return append(GOFSMockMounts, mockMounts...), nil
+	return GOFSMockMounts, nil
 }
 
 func (fs *mockfs) readProcMounts(_ context.Context,
