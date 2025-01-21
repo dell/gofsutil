@@ -18,6 +18,7 @@ package gofsutil
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -407,6 +408,313 @@ func TestFSMount(t *testing.T) {
 
 			assert.Equal(t, tt.expectedErr, err)
 			assert.Equal(t, tt.expectedMounts, GOFSMockMounts)
+		})
+	}
+}
+
+func TestFSUnmount(t *testing.T) {
+	tests := []struct {
+		testname       string
+		ctx            context.Context
+		target         string
+		induceErr      bool
+		expectedErr    error
+		expectedMounts []Info
+	}{
+		{
+			testname:    "Normal operation",
+			target:      "/mnt/volume1",
+			induceErr:   false,
+			expectedErr: nil,
+			expectedMounts: []Info{
+				{
+					Device: "/dev/sda2",
+					Path:   "/mnt/volume2",
+					Opts:   []string{"rw", "noexec"},
+				},
+			},
+		},
+		{
+			testname:    "Induced error",
+			target:      "/mnt/volume1",
+			induceErr:   true,
+			expectedErr: errors.New("unmount induced error"),
+			expectedMounts: []Info{
+				{
+					Device: "/dev/sda1",
+					Path:   "/mnt/volume1",
+					Opts:   []string{"rw", "relatime"},
+				},
+				{
+					Device: "/dev/sda2",
+					Path:   "/mnt/volume2",
+					Opts:   []string{"rw", "noexec"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceUnmountError = tt.induceErr
+			GOFSMockMounts = []Info{
+				{
+					Device: "/dev/sda1",
+					Path:   "/mnt/volume1",
+					Opts:   []string{"rw", "relatime"},
+				},
+				{
+					Device: "/dev/sda2",
+					Path:   "/mnt/volume2",
+					Opts:   []string{"rw", "noexec"},
+				},
+			}
+
+			err := fs.unmount(tt.ctx, tt.target)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedMounts, GOFSMockMounts)
+		})
+	}
+}
+
+func TestFSFindFSType(t *testing.T) {
+	tests := []struct {
+		testname     string
+		ctx          context.Context
+		mountpoint   string
+		induceErr    bool
+		expectedType string
+		expectedErr  error
+	}{
+		{
+			testname:     "Normal operation",
+			mountpoint:   "/mnt/volume1",
+			induceErr:    false,
+			expectedType: "xfs",
+			expectedErr:  nil,
+		},
+		{
+			testname:     "Induced error",
+			mountpoint:   "/mnt/volume1",
+			induceErr:    true,
+			expectedType: "",
+			expectedErr:  errors.New("getMounts induced error: Failed to fetch filesystem as no mount info"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceFSTypeError = tt.induceErr
+
+			fsType, err := fs.FindFSType(tt.ctx, tt.mountpoint)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedType, fsType)
+		})
+	}
+}
+
+func TestFSGetMountInfoFromDevice(t *testing.T) {
+	tests := []struct {
+		testname     string
+		ctx          context.Context
+		devID        string
+		induceErr    bool
+		expectedInfo *DeviceMountInfo
+		expectedErr  error
+	}{
+		{
+			testname:  "Normal operation",
+			devID:     "sda",
+			induceErr: false,
+			expectedInfo: &DeviceMountInfo{
+				DeviceNames: []string{"sda", "sdb"},
+				MPathName:   "mpathb",
+				MountPoint:  "/noderoot/var/lib/kubelet/pods/abc-123/volumes/k8.io/pmax-0123/mount",
+			},
+			expectedErr: nil,
+		},
+		{
+			testname:     "Induced error",
+			devID:        "sda",
+			induceErr:    true,
+			expectedInfo: nil,
+			expectedErr:  errors.New("getMounts induced error: Failed to find mount information"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceGetMountInfoFromDeviceError = tt.induceErr
+
+			info, err := fs.GetMountInfoFromDevice(tt.ctx, tt.devID)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedInfo, info)
+		})
+	}
+}
+
+func TestFSGetNVMeController(t *testing.T) {
+	tests := []struct {
+		testname           string
+		device             string
+		induceErr          bool
+		expectedController string
+		expectedErr        error
+	}{
+		{
+			testname:           "Normal operation",
+			device:             "nvme0n1",
+			induceErr:          false,
+			expectedController: "controller0",
+			expectedErr:        nil,
+		},
+		{
+			testname:           "Induced error",
+			device:             "nvme0n1",
+			induceErr:          true,
+			expectedController: "",
+			expectedErr:        errors.New("induced error"),
+		},
+		{
+			testname:           "Device does not exist",
+			device:             "nvme1n1",
+			induceErr:          false,
+			expectedController: "",
+			expectedErr:        fmt.Errorf("device nvme1n1 does not exist"),
+		},
+		{
+			testname:           "Controller not found",
+			device:             "nvme0n2",
+			induceErr:          false,
+			expectedController: "",
+			expectedErr:        fmt.Errorf("controller not found for device nvme0n2"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceGetNVMeControllerError = tt.induceErr
+			GONVMEValidDevices = map[string]bool{
+				"nvme0n1": true,
+				"nvme0n2": true, // Ensure the device exists
+			}
+			GONVMEDeviceToControllerMap = map[string]string{
+				"nvme0n1": "controller0",
+			}
+
+			controller, err := fs.GetNVMeController(tt.device)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedController, controller)
+		})
+	}
+}
+
+func TestFSGetSysBlockDevicesForVolumeWWN(t *testing.T) {
+	tests := []struct {
+		testname        string
+		ctx             context.Context
+		volumeWWN       string
+		induceErr       bool
+		expectedDevices []string
+		expectedErr     error
+	}{
+		{
+			testname:        "Normal operation",
+			volumeWWN:       "wwn-0x5000c500a0b1c2d3",
+			induceErr:       false,
+			expectedDevices: []string{"sda"},
+			expectedErr:     nil,
+		},
+		{
+			testname:        "Induced error",
+			volumeWWN:       "wwn-0x5000c500a0b1c2d3",
+			induceErr:       true,
+			expectedDevices: []string{},
+			expectedErr:     errors.New("induced error"),
+		},
+		{
+			testname:        "Volume WWN not found",
+			volumeWWN:       "wwn-0x5000c500a0b1c2d4",
+			induceErr:       false,
+			expectedDevices: []string{},
+			expectedErr:     nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceGetSysBlockDevicesError = tt.induceErr
+			GOFSMockWWNToDevice = map[string]string{
+				"wwn-0x5000c500a0b1c2d3": "/dev/sda",
+			}
+
+			devices, err := fs.GetSysBlockDevicesForVolumeWWN(tt.ctx, tt.volumeWWN)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.ElementsMatch(t, tt.expectedDevices, devices)
+		})
+	}
+}
+
+func TestFSTargetIPLUNToDevicePath(t *testing.T) {
+	tests := []struct {
+		testname       string
+		ctx            context.Context
+		targetIP       string
+		lunID          int
+		induceErr      bool
+		expectedResult map[string]string
+		expectedErr    error
+	}{
+		{
+			testname:  "Normal operation",
+			targetIP:  "192.xxx.1.1",
+			lunID:     1,
+			induceErr: false,
+			expectedResult: map[string]string{
+				"ip-192.xxx.1.1:-lun-1": "/dev/sdx",
+			},
+			expectedErr: nil,
+		},
+		{
+			testname:       "Induced error",
+			targetIP:       "192.xxx.1.1",
+			lunID:          1,
+			induceErr:      true,
+			expectedResult: map[string]string{},
+			expectedErr:    errors.New("induced error"),
+		},
+		{
+			testname:       "Target IP and LUN not found",
+			targetIP:       "192.xxx.1.2",
+			lunID:          2,
+			induceErr:      false,
+			expectedResult: map[string]string{},
+			expectedErr:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceTargetIPLUNToDeviceError = tt.induceErr
+			GOFSMockTargetIPLUNToDevice = map[string]string{
+				"ip-192.xxx.1.1:-lun-1": "/dev/sdx",
+			}
+
+			result, err := fs.TargetIPLUNToDevicePath(tt.ctx, tt.targetIP, tt.lunID)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
 }

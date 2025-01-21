@@ -175,7 +175,7 @@ func (fs *mockfs) GetMountInfoFromDevice(ctx context.Context, devID string) (*De
 
 func (fs *mockfs) getMountInfoFromDevice(_ context.Context, _ string) (*DeviceMountInfo, error) {
 	if GOFSMock.InduceGetMountInfoFromDeviceError {
-		return GOFSMockMountInfo, errors.New("getMounts induced error: Failed to find mount information")
+		return nil, errors.New("getMounts induced error: Failed to find mount information")
 	}
 	mntPoint := "/noderoot/var/lib/kubelet/pods/abc-123/volumes/k8.io/pmax-0123/mount"
 	GOFSMockMountInfo = &DeviceMountInfo{
@@ -491,7 +491,7 @@ func (fs *mockfs) TargetIPLUNToDevicePath(ctx context.Context, targetIP string, 
 // TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
 // and a LUN id. It returns the entry names in /dev/disk/by-path and their associated device paths, along with error.
 func (fs *mockfs) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID int) (map[string]string, error) {
-	result := make(map[string]string, 0)
+	result := make(map[string]string)
 	key := fmt.Sprintf("ip-%s:-lun-%d", targetIP, lunID)
 	if GOFSMockTargetIPLUNToDevice == nil {
 		GOFSMockTargetIPLUNToDevice = make(map[string]string)
@@ -499,8 +499,9 @@ func (fs *mockfs) targetIPLUNToDevicePath(_ context.Context, targetIP string, lu
 	if GOFSMock.InduceTargetIPLUNToDeviceError {
 		return result, errors.New("induced error")
 	}
-	path := GOFSMockTargetIPLUNToDevice[key]
-	result[key] = path
+	if path, exists := GOFSMockTargetIPLUNToDevice[key]; exists {
+		result[key] = path
+	}
 	return result, nil
 }
 
@@ -539,7 +540,7 @@ func (fs *mockfs) GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN 
 func (fs *mockfs) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	result := make([]string, 0)
 	if GOFSMock.InduceGetSysBlockDevicesError {
-		return result, errors.New("induced error")
+		return nil, errors.New("induced error")
 	}
 	for key, value := range GOFSMockWWNToDevice {
 		if key == volumeWWN {
