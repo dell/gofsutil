@@ -271,7 +271,7 @@ func (fs *mockfs) unmount(_ context.Context, target string) error {
 
 func (fs *mockfs) getDevMounts(_ context.Context, _ string) ([]Info, error) {
 	if GOFSMock.InduceDevMountsError {
-		return GOFSMockMounts, errors.New("dev mount induced error")
+		return nil, errors.New("dev mount induced error")
 	}
 	return GOFSMockMounts, nil
 }

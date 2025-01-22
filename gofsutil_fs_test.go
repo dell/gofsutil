@@ -718,3 +718,180 @@ func TestFSTargetIPLUNToDevicePath(t *testing.T) {
 		})
 	}
 }
+
+func TestFSGetMpathNameFromDevice(t *testing.T) {
+	tests := []struct {
+		testname      string
+		ctx           context.Context
+		device        string
+		induceErr     bool
+		expectedMpath string
+		expectedErr   error
+	}{
+		{
+			testname:      "Normal operation",
+			device:        "sda",
+			induceErr:     false,
+			expectedMpath: "mpatha",
+			expectedErr:   nil,
+		},
+		{
+			testname:      "Induced error",
+			device:        "sda",
+			induceErr:     true,
+			expectedMpath: "",
+			expectedErr:   errors.New("getMpathNameFromDevice induced error: Failed to find mount information"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceGetMpathNameFromDeviceError = tt.induceErr
+
+			mpath, err := fs.GetMpathNameFromDevice(tt.ctx, tt.device)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedMpath, mpath)
+		})
+	}
+}
+
+func TestFSGetDevMounts(t *testing.T) {
+	tests := []struct {
+		testname       string
+		ctx            context.Context
+		dev            string
+		induceErr      bool
+		expectedMounts []Info
+		expectedErr    error
+	}{
+		{
+			testname:  "Normal operation",
+			dev:       "sda",
+			induceErr: false,
+			expectedMounts: []Info{
+				{Device: "/dev/sda1", Path: "/mnt/volume1", Opts: []string{"rw", "relatime"}},
+				{Device: "/dev/sda2", Path: "/mnt/volume2", Opts: []string{"rw", "noexec"}},
+			},
+			expectedErr: nil,
+		},
+		{
+			testname:       "Induced error",
+			dev:            "sda",
+			induceErr:      true,
+			expectedMounts: nil,
+			expectedErr:    errors.New("dev mount induced error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceDevMountsError = tt.induceErr
+			GOFSMockMounts = []Info{
+				{Device: "/dev/sda1", Path: "/mnt/volume1", Opts: []string{"rw", "relatime"}},
+				{Device: "/dev/sda2", Path: "/mnt/volume2", Opts: []string{"rw", "noexec"}},
+			}
+
+			mounts, err := fs.getDevMounts(tt.ctx, tt.dev)
+
+			assert.Equal(t, tt.expectedErr, err)
+			assert.Equal(t, tt.expectedMounts, mounts)
+		})
+	}
+}
+
+func TestFSBindMount(t *testing.T) {
+	tests := []struct {
+		testname    string
+		ctx         context.Context
+		source      string
+		target      string
+		options     []string
+		induceErr   bool
+		expectedErr error
+	}{
+		{
+			testname:    "Normal operation with options",
+			source:      "/source",
+			target:      "/target",
+			options:     []string{"ro"},
+			induceErr:   false,
+			expectedErr: nil,
+		},
+		{
+			testname:    "Normal operation without options",
+			source:      "/source",
+			target:      "/target",
+			options:     nil,
+			induceErr:   false,
+			expectedErr: nil,
+		},
+		{
+			testname:    "Induced error",
+			source:      "/source",
+			target:      "/target",
+			options:     []string{"ro"},
+			induceErr:   true,
+			expectedErr: errors.New("mount induced error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceMountError = tt.induceErr
+
+			err := fs.BindMount(tt.ctx, tt.source, tt.target, tt.options...)
+
+			assert.Equal(t, tt.expectedErr, err)
+		})
+	}
+}
+
+func TestFSRescanSCSIHost(t *testing.T) {
+	tests := []struct {
+		testname    string
+		ctx         context.Context
+		hosts       []string
+		lun         string
+		induceErr   bool
+		expectedErr error
+	}{
+		{
+			testname:    "Normal operation",
+			hosts:       []string{"host1", "host2"},
+			lun:         "0",
+			induceErr:   false,
+			expectedErr: nil,
+		},
+		{
+			testname:    "Induced error",
+			hosts:       []string{"host1", "host2"},
+			lun:         "0",
+			induceErr:   true,
+			expectedErr: errors.New("induced rescan error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := &mockfs{}
+			GOFSMock.InduceRescanError = tt.induceErr
+
+			var callbackCalled bool
+			GOFSRescanCallback = func(scanString string) {
+				callbackCalled = true
+				assert.Equal(t, tt.lun, scanString)
+			}
+
+			err := fs.rescanSCSIHost(tt.ctx, tt.hosts, tt.lun)
+
+			assert.Equal(t, tt.expectedErr, err)
+			if !tt.induceErr {
+				assert.True(t, callbackCalled)
+			}
+		})
+	}
+}

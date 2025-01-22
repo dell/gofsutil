@@ -165,16 +165,16 @@ func TestUnmount(t *testing.T) {
 	}
 }
 
-// func TestGetMountInfoFromDevice(t *testing.T) {
-// 	ctx := context.Background()
-// 	devID := "sda1"
+func TestGetMountInfoFromDevice(t *testing.T) {
+	ctx := context.Background()
+	devID := "sda1"
 
-// 	result, err := GetMountInfoFromDevice(ctx, devID)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got %v", err)
-// 	}
-// 	t.Logf("Mount info: %+v", result)
-// }
+	result, err := GetMountInfoFromDevice(ctx, devID)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	t.Logf("Mount info: %+v", result)
+}
 
 func TestGetMpathNameFromDevice(t *testing.T) {
 	ctx := context.Background()
