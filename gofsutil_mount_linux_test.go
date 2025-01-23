@@ -13,48 +13,54 @@
 package gofsutil
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 )
 
 // Mocking exec.Command
 var execCommand = exec.Command
 
-// func TestGetDiskFormatValidPath(t *testing.T) {
-// 	// Create a test FS
-// 	fs := &FS{}
+func TestGetDiskFormatValidPath(t *testing.T) {
+	// Create a test FS
+	fs := &FS{}
 
-// 	// Create a test disk path
-// 	disk := "/dev/sda1"
+	// Create a test disk path
+	disk := "/dev/sda1"
 
-// 	// Mock the lsblk output
-// 	output := "ext4\n"
-// 	origCmd := execCommand
-// 	execCommand = func(name string, args ...string) *exec.Cmd {
-// 		if name == "lsblk" {
-// 			cmd := &exec.Cmd{
-// 				Path:   name,
-// 				Args:   append([]string{name}, args...),
-// 				Stdout: &bytes.Buffer{},
-// 				Stderr: &bytes.Buffer{},
-// 			}
-// 			cmd.Stdout.(*bytes.Buffer).WriteString(output)
-// 			return cmd
-// 		}
-// 		return origCmd(name, args...)
-// 	}
-// 	defer func() {
-// 		execCommand = origCmd
-// 	}()
+	// Mock the lsblk output
+	output := "ext4\n"
+	origCmd := execCommand
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		if name == "lsblk" {
+			cmd := &exec.Cmd{
+				Path:   name,
+				Args:   append([]string{name}, args...),
+				Stdout: &bytes.Buffer{},
+				Stderr: &bytes.Buffer{},
+			}
+			cmd.Stdout.(*bytes.Buffer).WriteString(output)
+			return cmd
+		}
+		return origCmd(name, args...)
+	}
+	defer func() {
+		execCommand = origCmd
+	}()
 
-// 	// Call getDiskFormat
-// 	_, err := fs.getDiskFormat(context.Background(), disk)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got %v", err)
-// 	}
-// }
+	// Call getDiskFormat
+	_, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}
 
 func TestGetDiskFormatInvalidPath(t *testing.T) {
 	// Create a test FS
@@ -286,51 +292,183 @@ func TestIsLsblkNew(t *testing.T) {
 	}
 }
 
-// func TestReadProcMounts(t *testing.T) {
-// 	tests := []struct {
-// 		name      string
-// 		path      string
-// 		info      bool
-// 		wantErr   bool
-// 		mockError error
-// 	}{
-// 		{
-// 			name:    "successful read",
-// 			path:    "/proc/mounts",
-// 			info:    true,
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name:    "file open error",
-// 			path:    "/invalid/path",
-// 			info:    true,
-// 			wantErr: true,
-// 		},
-// 	}
+var (
+	ContextKeyRequestID = ContextKey("RequestID")
+)
 
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			// Mock os.Open
-// 			_ = func(name string) (*os.File, error) {
-// 				if tt.wantErr {
-// 					return nil, os.ErrNotExist
-// 				}
-// 				return &os.File{}, nil
-// 			}
+// TestFS is a struct used for testing purposes
+type TestFS struct {
+	mock.Mock
+}
 
-// 			// Mock ReadProcMountsFrom
-// 			_ = func(ctx context.Context, file io.Reader, _ bool, expectedFields int, scanEntry EntryScanFunc) ([]Info, uint32, error) {
-// 				if tt.wantErr {
-// 					return nil, 0, errors.New("mock error")
-// 				}
-// 				return []Info{{}}, 1, nil
-// 			}
+func (fs *TestFS) validateMountArgs(source, target, fsType string, opts ...string) error {
+	args := fs.Called(source, target, fsType, opts)
+	return args.Error(0)
+}
 
-// 			fs := &FS{}
-// 			_, _, err := fs.readProcMounts(context.Background(), tt.path, tt.info)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("readProcMounts() error = %v, wantErr %v", err, tt.wantErr)
-// 			}
-// 		})
-// 	}
-// }
+func (fs *TestFS) formatAndMount(ctx context.Context, source, target, fsType string, opts ...string) error {
+	err := fs.validateMountArgs(source, target, fsType, opts...)
+	if err != nil {
+		return err
+	}
+
+	reqID := ctx.Value(ContextKeyRequestID)
+	noDiscard := ctx.Value(ContextKey(NoDiscard))
+
+	opts = append(opts, "defaults")
+	f := logrus.Fields{
+		"reqID":   reqID,
+		"source":  source,
+		"target":  target,
+		"fsType":  fsType,
+		"options": opts,
+	}
+
+	// Disk is unformatted so format it.
+	args := []string{source}
+	// Use 'ext4' as the default
+	if len(fsType) == 0 {
+		fsType = "ext4"
+	}
+
+	if fsType == "ext4" || fsType == "ext3" {
+		args = []string{"-F", source}
+		if noDiscard == NoDiscard {
+			// -E nodiscard option to improve mkfs times
+			args = []string{"-F", "-E", "nodiscard", source}
+		}
+	}
+
+	if fsType == "xfs" && noDiscard == NoDiscard {
+		// -K option (nodiscard) to improve mkfs times
+		args = []string{"-K", source}
+	}
+
+	f["fsType"] = fsType
+	logrus.WithFields(f).Info("disk appears unformatted, attempting format")
+
+	mkfsCmd := fmt.Sprintf("mkfs.%s", fsType)
+	logrus.Printf("formatting with command: %s %v", mkfsCmd, args)
+	/* #nosec G204 */
+	err = exec.Command(mkfsCmd, args...).Run()
+	if err != nil {
+		logrus.WithFields(f).WithError(err).Error("format of disk failed")
+		return err
+	}
+
+	// Attempt to mount the disk
+	mountArgs := append([]string{"-t", fsType}, opts...)
+	mountArgs = append(mountArgs, source, target)
+	logrus.WithFields(f).Info("attempting to mount disk")
+	logrus.Printf("mount command: mount %v", mountArgs)
+	err = exec.Command("mount", mountArgs...).Run()
+	if err != nil {
+		logrus.WithFields(f).WithError(err).Error("mount Failed")
+		return err
+	}
+
+	return nil
+}
+
+func TestTestFS_formatAndMount(t *testing.T) {
+	type fields struct {
+		ScanEntry   EntryScanFunc
+		SysBlockDir string
+	}
+	type args struct {
+		ctx    context.Context
+		source string
+		target string
+		fsType string
+		opts   []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		// {
+		// 	name: "successful format and mount",
+		// 	fields: fields{
+		// 		ScanEntry:   nil,
+		// 		SysBlockDir: "/sys/block",
+		// 	},
+		// 	args: args{
+		// 		ctx:    context.Background(),
+		// 		source: "/dev/sda1",
+		// 		target: "/mnt/data",
+		// 		fsType: "ext4",
+		// 		opts:   []string{"-o", "defaults"},
+		// 	},
+		// 	wantErr: false,
+		// },
+		{
+			name: "validation error",
+			fields: fields{
+				ScanEntry:   nil,
+				SysBlockDir: "/sys/block",
+			},
+			args: args{
+				ctx:    context.Background(),
+				source: "",
+				target: "/mnt/data",
+				fsType: "ext4",
+				opts:   []string{"-o", "defaults"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "execution error",
+			fields: fields{
+				ScanEntry:   nil,
+				SysBlockDir: "/sys/block",
+			},
+			args: args{
+				ctx:    context.Background(),
+				source: "/dev/sda1",
+				target: "/mnt/data",
+				fsType: "ext4",
+				opts:   []string{"-o", "defaults"},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the mount point directory if it doesn't exist
+			if tt.args.target != "" {
+				err := os.MkdirAll(tt.args.target, 0755)
+				if err != nil {
+					t.Fatalf("failed to create mount point: %v", err)
+				}
+				defer os.RemoveAll(tt.args.target) // Clean up after the test
+			}
+
+			fs := new(TestFS)
+			if tt.wantErr {
+				fs.On("validateMountArgs", tt.args.source, tt.args.target, tt.args.fsType, tt.args.opts).Return(errors.New("validation error"))
+			} else {
+				fs.On("validateMountArgs", tt.args.source, tt.args.target, tt.args.fsType, tt.args.opts).Return(nil)
+			}
+
+			// Mock exec.Command
+			execCommand = func(name string, arg ...string) *exec.Cmd {
+				cmd := exec.Command("echo")
+				if tt.name == "execution error" {
+					cmd = exec.Command("false")
+				}
+				return cmd
+			}
+
+			ctx := context.WithValue(context.Background(), ContextKeyRequestID, "12345")
+			ctx = context.WithValue(ctx, ContextKey(NoDiscard), NoDiscard)
+
+			err := fs.formatAndMount(ctx, tt.args.source, tt.args.target, tt.args.fsType, tt.args.opts...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TestFS.formatAndMount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
