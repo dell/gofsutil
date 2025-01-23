@@ -15,21 +15,32 @@ package gofsutil
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// func TestGetDiskFormat(t *testing.T) {
-// 	ctx := context.Background()
-// 	disk := "/dev/sda1"
+func TestGetDiskFormat(t *testing.T) {
+	ctx := context.Background()
+	var disk string
 
-// 	result, err := GetDiskFormat(ctx, disk)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got %v", err)
-// 	}
-// 	t.Logf("Disk format: %s", result)
-// }
+	switch runtime.GOOS {
+	case "windows":
+		disk = "C:\\"
+	case "linux", "darwin":
+		disk = "/dev/sda1"
+	default:
+		t.Fatalf("unsupported OS: %s", runtime.GOOS)
+	}
+
+	result, err := GetDiskFormat(ctx, disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	t.Logf("Disk format: %s", result)
+	assert.NotEmpty(t, result)
+}
 
 func TestFormatAndMount(t *testing.T) {
 	tests := []struct {
