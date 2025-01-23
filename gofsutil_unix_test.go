@@ -427,6 +427,7 @@ func TestIsBind(t *testing.T) {
 		})
 	}
 }
+
 func TestGetDevMounts(t *testing.T) {
 	tests := []struct {
 		testname  string
@@ -494,7 +495,6 @@ func TestValidateDevice(t *testing.T) {
 // }
 
 func TestRescanSCSIHost(t *testing.T) {
-
 	tests := []struct {
 		testname  string
 		ctx       context.Context

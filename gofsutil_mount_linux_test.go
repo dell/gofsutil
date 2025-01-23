@@ -174,13 +174,13 @@ type MockFS struct {
 	FS
 }
 
-func (fs *MockFS) validateMountArgs(source, target, fsType string, opts ...string) error {
-	// Mock validation logic
-	if source == "" || target == "" || fsType == "" {
-		return errors.New("invalid arguments")
-	}
-	return nil
-}
+// func (fs *MockFS) validateMountArgs(source, target, fsType string, opts ...string) error {
+// 	// Mock validation logic
+// 	if source == "" || target == "" || fsType == "" {
+// 		return errors.New("invalid arguments")
+// 	}
+// 	return nil
+// }
 
 func TestFormat(t *testing.T) {
 	fs := &MockFS{}
@@ -219,7 +219,7 @@ func TestFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock exec.Command
-			execCommand = func(name string, arg ...string) *exec.Cmd {
+			execCommand = func(_ string, _ ...string) *exec.Cmd {
 				cmd := exec.Command("echo", "mock command")
 				if tt.mockError != nil {
 					cmd = exec.Command("false")
@@ -265,8 +265,8 @@ func TestIsLsblkNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock exec.Command
-			execCommand = func(name string, arg ...string) *exec.Cmd {
-				cmd := exec.Command("echo", tt.output)
+			execCommand = func(_ string, _ ...string) *exec.Cmd {
+				cmd := exec.Command("echo", "mock command")
 				if tt.wantError {
 					cmd = exec.Command("false")
 				}
