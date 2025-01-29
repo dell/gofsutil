@@ -132,6 +132,9 @@ func TestMountArgs(t *testing.T) {
 }
 
 func TestWWNToDevicePath(t *testing.T) {
+	tempDir := t.TempDir()
+	SysBlockDir = tempDir
+
 	tests := []struct {
 		src    string
 		tgt    string
@@ -251,7 +254,7 @@ func TestValidateMountArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
-			fs := FS{SysBlockDir: "string"}
+			fs := FS{}
 			err := fs.validateMountArgs(tt.source, tt.target, tt.fstype, tt.opts...)
 			assert.Equal(t, tt.expect, err)
 		})
@@ -291,7 +294,7 @@ func TestDoMount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
-			fs := FS{SysBlockDir: "string"}
+			fs := FS{}
 			err := fs.doMount(tt.ctx, tt.mntCmnd, tt.source, tt.target, tt.fstype, tt.opts...)
 			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
 		})
@@ -319,7 +322,7 @@ func TestUnMount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
-			fs := FS{SysBlockDir: "string"}
+			fs := FS{}
 			err := fs.unmount(tt.ctx, tt.target)
 			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
 		})
@@ -398,7 +401,7 @@ func TestMultipathCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
-			fs := FS{SysBlockDir: "string"}
+			fs := FS{}
 			_, err := fs.multipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments...)
 			assert.Equal(t, tt.expectErr, err)
 		})
@@ -421,7 +424,7 @@ func TestIsBind(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
-			fs := FS{SysBlockDir: "string"}
+			fs := FS{}
 			_, err := fs.isBind(tt.ctx, tt.opts...)
 			assert.Equal(t, tt.expect, err)
 		})

@@ -89,7 +89,7 @@ func TestGetMounts(t *testing.T) {
 
 func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 	tempDir := t.TempDir()
-	gofsutil.UseMockSysBlockDir(tempDir)
+	gofsutil.SysBlockDir = tempDir
 
 	tests := []struct {
 		name           string
@@ -153,7 +153,7 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 
 func TestGetNVMeController(t *testing.T) {
 	tempDir := t.TempDir()
-	gofsutil.UseMockSysBlockDir(tempDir)
+	gofsutil.SysBlockDir = tempDir
 
 	tests := map[string]struct {
 		device      string

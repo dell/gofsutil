@@ -19,12 +19,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// SysBlockDir is used to set the directory of block devices.
+var SysBlockDir string = "/sys/block"
+
 // FS provides many filesystem-specific functions, such as mount, format, etc.
 type FS struct {
 	// ScanEntry is the function used to process mount table entries.
 	ScanEntry EntryScanFunc
-	// SysBlockDir is used to set the directory of block devices.
-	SysBlockDir string
 }
 
 // GetDiskFormat uses 'lsblk' to see if the given disk is unformatted.

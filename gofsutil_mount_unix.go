@@ -650,9 +650,9 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	start := time.Now()
 	result := make([]string, 0)
-	sysBlocks, err := os.ReadDir(fs.SysBlockDir)
+	sysBlocks, err := os.ReadDir(SysBlockDir)
 	if err != nil {
-		return result, fmt.Errorf("Error reading %s: %s", fs.SysBlockDir, err)
+		return result, fmt.Errorf("Error reading %s: %s", SysBlockDir, err)
 	}
 
 	for _, sysBlock := range sysBlocks {
@@ -665,9 +665,9 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string
 		// Set the WWID path based on the device type
 		var wwidPath string
 		if strings.HasPrefix(name, "nvme") {
-			wwidPath = fs.SysBlockDir + "/" + name + "/wwid" // For NVMe devices
+			wwidPath = SysBlockDir + "/" + name + "/wwid" // For NVMe devices
 		} else {
-			wwidPath = fs.SysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
+			wwidPath = SysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
 		}
 
 		bytes, err := os.ReadFile(filepath.Clean(wwidPath))
@@ -746,7 +746,7 @@ func wwnMatches(nguid, wwn string) bool {
 
 // GetNVMeController retrieves the NVMe controller for a given NVMe device.
 func (fs *FS) getNVMeController(device string) (string, error) {
-	devicePath := filepath.Join(fs.SysBlockDir, device)
+	devicePath := filepath.Join(SysBlockDir, device)
 
 	// Check if the device path exists
 	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
