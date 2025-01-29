@@ -131,88 +131,88 @@ func TestMountArgs(t *testing.T) {
 	}
 }
 
-// func TestWWNToDevicePath(t *testing.T) {
-// 	tests := []struct {
-// 		src    string
-// 		tgt    string
-// 		wwn    string
-// 		result string
-// 	}{
-// 		{
-// 			src:    "/dev/disk/by-id/wwn-0x60570970000197900046533030394146",
-// 			tgt:    "../../mydeva",
-// 			wwn:    "60570970000197900046533030394146",
-// 			result: "/dev/mydeva",
-// 		},
-// 		{
-// 			src:    "/dev/disk/by-id/dm-uuid-mpath-360570970000197900046533030394146",
-// 			tgt:    "../../mydevb",
-// 			wwn:    "60570970000197900046533030394146",
-// 			result: "/dev/mydevb",
-// 		},
-// 		{
-// 			src:    "/dev/disk/by-id/nvme-eui.12635330303134340000976000012000",
-// 			tgt:    "../../mydevb",
-// 			wwn:    "12635330303134340000976000012000",
-// 			result: "/dev/mydevb",
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run("", func(_ *testing.T) {
-// 			// Change directories
-// 			workingDirectory, _ := os.Getwd()
-// 			err := os.Chdir("/dev/disk/by-id")
-// 			if err != nil {
-// 				t.Errorf("Couldn't Chdir to /dev/disk/by/id: %s", err)
-// 			}
-// 			// Create a target
-// 			file, err := os.Create(tt.result)
-// 			if err != nil {
-// 				t.Errorf("Couldn't Create %s: %s", tt.result, err)
-// 			}
-// 			file.Close()
-// 			// Create a symlink
-// 			err = os.Symlink(tt.tgt, tt.src)
-// 			if err != nil {
-// 				t.Errorf("Couldn't create Symlink %s: %s", tt.tgt, err)
-// 			}
-// 			// Get the entry
-// 			a, b, err := WWNToDevicePathX(context.Background(), tt.wwn)
-// 			if err != nil {
-// 				t.Errorf("Couldn't find DevicePathX: %s", err)
-// 			}
-// 			if a != tt.src {
-// 				t.Errorf("Expected %s got %s", tt.src, a)
-// 			}
-// 			if b != tt.result {
-// 				t.Errorf("Expected %s got %s", tt.result, b)
-// 			}
-// 			// Get the entry
-// 			c, err := WWNToDevicePath(context.Background(), tt.wwn)
-// 			if err != nil {
-// 				t.Errorf("Couldn't find DevicePathX: %s", err)
-// 			}
-// 			if c != tt.result {
-// 				t.Errorf("Expected %s got %s", tt.result, c)
-// 			}
-// 			// Remove symlink
-// 			err = os.Remove(tt.src)
-// 			if err != nil {
-// 				t.Errorf("Couldn't remove %s: %s", tt.src, err)
-// 			}
-// 			// Remove target
-// 			err = os.Remove(tt.result)
-// 			if err != nil {
-// 				t.Errorf("Couldn't remove %s: %s", tt.result, err)
-// 			}
-// 			// Change directories
-// 			err = os.Chdir(workingDirectory)
-// 			if err != nil {
-// 				t.Errorf("Couldn't Chdir to /dev/disk/by/id: %s", err)
-// 			}
-// 		})
-// 	}
-// }
+func TestWWNToDevicePath(t *testing.T) {
+	tests := []struct {
+		src    string
+		tgt    string
+		wwn    string
+		result string
+	}{
+		{
+			src:    "/dev/disk/by-id/wwn-0x60570970000197900046533030394146",
+			tgt:    "../../mydeva",
+			wwn:    "60570970000197900046533030394146",
+			result: "/dev/mydeva",
+		},
+		{
+			src:    "/dev/disk/by-id/dm-uuid-mpath-360570970000197900046533030394146",
+			tgt:    "../../mydevb",
+			wwn:    "60570970000197900046533030394146",
+			result: "/dev/mydevb",
+		},
+		{
+			src:    "/dev/disk/by-id/nvme-eui.12635330303134340000976000012000",
+			tgt:    "../../mydevb",
+			wwn:    "12635330303134340000976000012000",
+			result: "/dev/mydevb",
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(_ *testing.T) {
+			// Change directories
+			workingDirectory, _ := os.Getwd()
+			err := os.Chdir("/dev/disk/by-id")
+			if err != nil {
+				t.Errorf("Couldn't Chdir to /dev/disk/by/id: %s", err)
+			}
+			// Create a target
+			file, err := os.Create(tt.result)
+			if err != nil {
+				t.Errorf("Couldn't Create %s: %s", tt.result, err)
+			}
+			file.Close()
+			// Create a symlink
+			err = os.Symlink(tt.tgt, tt.src)
+			if err != nil {
+				t.Errorf("Couldn't create Symlink %s: %s", tt.tgt, err)
+			}
+			// Get the entry
+			a, b, err := WWNToDevicePathX(context.Background(), tt.wwn)
+			if err != nil {
+				t.Errorf("Couldn't find DevicePathX: %s", err)
+			}
+			if a != tt.src {
+				t.Errorf("Expected %s got %s", tt.src, a)
+			}
+			if b != tt.result {
+				t.Errorf("Expected %s got %s", tt.result, b)
+			}
+			// Get the entry
+			c, err := WWNToDevicePath(context.Background(), tt.wwn)
+			if err != nil {
+				t.Errorf("Couldn't find DevicePathX: %s", err)
+			}
+			if c != tt.result {
+				t.Errorf("Expected %s got %s", tt.result, c)
+			}
+			// Remove symlink
+			err = os.Remove(tt.src)
+			if err != nil {
+				t.Errorf("Couldn't remove %s: %s", tt.src, err)
+			}
+			// Remove target
+			err = os.Remove(tt.result)
+			if err != nil {
+				t.Errorf("Couldn't remove %s: %s", tt.result, err)
+			}
+			// Change directories
+			err = os.Chdir(workingDirectory)
+			if err != nil {
+				t.Errorf("Couldn't Chdir to /dev/disk/by/id: %s", err)
+			}
+		})
+	}
+}
 
 func TestValidateMountArgs(t *testing.T) {
 	tests := []struct {
