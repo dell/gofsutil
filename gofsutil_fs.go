@@ -20,7 +20,7 @@ import (
 )
 
 // SysBlockDir is used to set the directory of block devices.
-var SysBlockDir string = "/sys/block"
+var SysBlockDir = "/sys/block"
 
 // FS provides many filesystem-specific functions, such as mount, format, etc.
 type FS struct {
