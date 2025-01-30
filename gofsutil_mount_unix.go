@@ -214,11 +214,12 @@ func (fs *FS) wwnToDevicePath(
 
 	// Look for nvme path device.
 	if err != nil || devPath == "" {
-		symlinkPath = fmt.Sprintf("/dev/disk/by-id/nvme-eui.%s", wwn)
+		symlinkPath = filepath.Join(multipathDevDiskByID, fmt.Sprintf("nvme-eui.%s", wwn))
 		devPath, err = os.Readlink(symlinkPath)
 		if err != nil || devPath == "" {
 			// Look for normal path device
-			symlinkPath = fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+			symlinkPath = filepath.Join(multipathDevDiskByID, fmt.Sprintf("wwn-0x%s", wwn))
+
 			devPath, err = os.Readlink(symlinkPath)
 			if err != nil {
 				log.Printf("Check for disk path %s not found", symlinkPath)

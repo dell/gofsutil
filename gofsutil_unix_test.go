@@ -20,12 +20,14 @@ import (
 	// "fmt"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // func TestFCRescanSCSIHost(t *testing.T) {
@@ -133,86 +135,55 @@ func TestMountArgs(t *testing.T) {
 
 func TestWWNToDevicePath(t *testing.T) {
 	tempDir := t.TempDir()
-	SysBlockDir = tempDir
+	multipathDevDiskByID = tempDir
+	MultipathDevDiskByIDPrefix = filepath.Join(tempDir, "dm-uuid-mpath-3")
+	fs := &FS{}
 
 	tests := []struct {
-		src    string
-		tgt    string
-		wwn    string
-		result string
+		name            string
+		wwn             string
+		symlinkPath     string
+		devicePath      string
+		expectedSymlink string
+		expectedDevice  string
 	}{
 		{
-			src:    "/dev/disk/by-id/wwn-0x60570970000197900046533030394146",
-			tgt:    "../../mydeva",
-			wwn:    "60570970000197900046533030394146",
-			result: "/dev/mydeva",
+			name:            "Multipath device",
+			wwn:             "36057097000019790004653302024d444",
+			symlinkPath:     filepath.Join(tempDir, "dm-uuid-mpath-336057097000019790004653302024d444"),
+			devicePath:      "/dev/mapper/mpatha",
+			expectedSymlink: filepath.Join(tempDir, "dm-uuid-mpath-336057097000019790004653302024d444"),
+			expectedDevice:  "/dev/mpatha",
 		},
 		{
-			src:    "/dev/disk/by-id/dm-uuid-mpath-360570970000197900046533030394146",
-			tgt:    "../../mydevb",
-			wwn:    "60570970000197900046533030394146",
-			result: "/dev/mydevb",
+			name:            "NVMe device",
+			wwn:             "12636210324d0000300000000000f001",
+			symlinkPath:     filepath.Join(tempDir, "nvme-eui.12636210324d0000300000000000f001"),
+			devicePath:      "/dev/nvme0n1",
+			expectedSymlink: filepath.Join(tempDir, "nvme-eui.12636210324d0000300000000000f001"),
+			expectedDevice:  "/dev/nvme0n1",
 		},
 		{
-			src:    "/dev/disk/by-id/nvme-eui.12635330303134340000976000012000",
-			tgt:    "../../mydevb",
-			wwn:    "12635330303134340000976000012000",
-			result: "/dev/mydevb",
+			name:            "Normal device",
+			wwn:             "60000970000120001263533030313434",
+			symlinkPath:     filepath.Join(tempDir, "wwn-0x60000970000120001263533030313434"),
+			devicePath:      "/dev/sda",
+			expectedSymlink: filepath.Join(tempDir, "wwn-0x60000970000120001263533030313434"),
+			expectedDevice:  "/dev/sda",
 		},
 	}
+
 	for _, tt := range tests {
-		t.Run("", func(_ *testing.T) {
-			// Change directories
-			workingDirectory, _ := os.Getwd()
-			err := os.Chdir("/dev/disk/by-id")
-			if err != nil {
-				t.Errorf("Couldn't Chdir to /dev/disk/by/id: %s", err)
-			}
-			// Create a target
-			file, err := os.Create(tt.result)
-			if err != nil {
-				t.Errorf("Couldn't Create %s: %s", tt.result, err)
-			}
-			file.Close()
-			// Create a symlink
-			err = os.Symlink(tt.tgt, tt.src)
-			if err != nil {
-				t.Errorf("Couldn't create Symlink %s: %s", tt.tgt, err)
-			}
-			// Get the entry
-			a, b, err := WWNToDevicePathX(context.Background(), tt.wwn)
-			if err != nil {
-				t.Errorf("Couldn't find DevicePathX: %s", err)
-			}
-			if a != tt.src {
-				t.Errorf("Expected %s got %s", tt.src, a)
-			}
-			if b != tt.result {
-				t.Errorf("Expected %s got %s", tt.result, b)
-			}
-			// Get the entry
-			c, err := WWNToDevicePath(context.Background(), tt.wwn)
-			if err != nil {
-				t.Errorf("Couldn't find DevicePathX: %s", err)
-			}
-			if c != tt.result {
-				t.Errorf("Expected %s got %s", tt.result, c)
-			}
-			// Remove symlink
-			err = os.Remove(tt.src)
-			if err != nil {
-				t.Errorf("Couldn't remove %s: %s", tt.src, err)
-			}
-			// Remove target
-			err = os.Remove(tt.result)
-			if err != nil {
-				t.Errorf("Couldn't remove %s: %s", tt.result, err)
-			}
-			// Change directories
-			err = os.Chdir(workingDirectory)
-			if err != nil {
-				t.Errorf("Couldn't Chdir to /dev/disk/by/id: %s", err)
-			}
+		t.Run(tt.name, func(t *testing.T) {
+			// Creating mock symlink
+			require.NoError(t, os.MkdirAll(filepath.Dir(tt.symlinkPath), 0o755))
+			require.NoError(t, os.Symlink(tt.devicePath, tt.symlinkPath))
+
+			// Call the function with the test input
+			symlink, device, err := fs.WWNToDevicePath(context.Background(), tt.wwn)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedSymlink, symlink)
+			assert.Equal(t, tt.expectedDevice, device)
 		})
 	}
 }
