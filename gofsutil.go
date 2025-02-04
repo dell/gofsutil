@@ -90,6 +90,9 @@ var (
 
 	multipathDevDiskByID = "/dev/disk/by-id/"
 	bypathdir            = "/dev/disk/by-path"
+	fcHostsDir           = "/sys/class/fc_host"
+	sessionsdir          = "/sys/class/iscsi_session"
+	fcRemotePortsDir     = "/sys/class/fc_remote_ports"
 )
 
 // ContextKey is a variable containing context-keys

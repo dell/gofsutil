@@ -384,7 +384,6 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 		return targetDev, nil
 	}
 	// Read the directory entries for fc_remote_ports
-	fcRemotePortsDir := "/sys/class/fc_remote_ports"
 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcRemotePortsDir)
@@ -439,7 +438,6 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 		return targetDev, nil
 	}
 	// Read the sessions.
-	sessionsdir := "/sys/class/iscsi_session"
 	sessions, err := os.ReadDir(sessionsdir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
@@ -588,7 +586,6 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 	portWWNs := make([]string, 0)
 	// Read the directory entries for fc_remote_ports
-	fcHostsDir := "/sys/class/fc_host"
 	hostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
@@ -615,7 +612,6 @@ func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 	var savedError error
 	// Read the directory entries for fc_remote_ports
-	fcHostsDir := "/sys/class/fc_host"
 	fcHostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)

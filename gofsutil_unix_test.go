@@ -67,16 +67,6 @@ import (
 // 	}
 // }
 
-// func TestGetFCHostPortWWNs(t *testing.T) {
-// 	wwns, err := gofsutil.GetFCHostPortWWNs(context.Background())
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// 	for _, wwn := range wwns {
-// 		fmt.Printf("local FC port wwn: %s\n", wwn)
-// 	}
-// }
-
 func TestMountArgs(t *testing.T) {
 	tests := []struct {
 		src    string
@@ -189,6 +179,8 @@ func TestWWNToDevicePath(t *testing.T) {
 }
 
 func TestTargetIPLUNToDevicePath(t *testing.T) {
+	tempDir := t.TempDir()
+	bypathdir = tempDir // Use the temporary directory for testing
 	require.NoError(t, os.MkdirAll(bypathdir, 0o755))
 
 	fs := &FS{}
@@ -375,55 +367,6 @@ func TestUnMount(t *testing.T) {
 	}
 }
 
-func TestGetFCTargetHosts(t *testing.T) {
-	tests := []struct {
-		testname  string
-		targets   []string
-		expectErr error
-	}{
-		{
-			testname:  "Invalid target hosts",
-			targets:   []string{"a", "b"},
-			expectErr: nil,
-		},
-		{
-			testname:  "Target hosts",
-			targets:   []string{"iqn.2016-06.io.k8s", "iqn.2017-06.io.k8s", "0x500000"},
-			expectErr: nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.testname, func(t *testing.T) {
-			_, err := getFCTargetHosts(tt.targets)
-			assert.Equal(t, tt.expectErr, err)
-		})
-	}
-}
-
-func TestGetIscsiTargetHosts(t *testing.T) {
-	tests := []struct {
-		testname  string
-		targets   []string
-		expectErr error
-	}{
-		{
-			testname: "Invalid target hosts",
-			targets:  []string{"a", "b"},
-			expectErr: &os.PathError{
-				Op:   "open",                     // Operation that caused the error
-				Path: "/sys/class/iscsi_session", // Path where the error occurred
-				Err:  syscall.ENOENT,             // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.testname, func(t *testing.T) {
-			_, err := getIscsiTargetHosts(tt.targets)
-			assert.Equal(t, tt.expectErr, err)
-		})
-	}
-}
-
 func TestMultipathCommand(t *testing.T) {
 	tests := []struct {
 		testname       string
@@ -520,29 +463,6 @@ func TestValidateDevice(t *testing.T) {
 	}
 }
 
-// func TestTargetIPLUNToDevicePath(t *testing.T) {
-// 	tests := []struct {
-// 		testname  string
-// 		ctx       context.Context
-// 		targetIP  string
-// 		lunID     int
-// 		expectErr error
-// 	}{
-// 		{
-// 			testname:  "Invalid lunid",
-// 			targetIP:  "10.0.0.100",
-// 			lunID:     1234,
-// 			expectErr: nil,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.testname, func(t *testing.T) {
-// 			_, err := TargetIPLUNToDevicePath(tt.ctx, tt.targetIP, tt.lunID)
-// 			assert.Equal(t, tt.expectErr, err)
-// 		})
-// 	}
-// }
-
 func TestRescanSCSIHost(t *testing.T) {
 	tests := []struct {
 		testname  string
@@ -597,17 +517,311 @@ func TestRemoveBlockDevice(t *testing.T) {
 	}
 }
 
-// func TestGetFCHostPortWWNs(t *testing.T) {
-// 	expectErr := &os.PathError{
-// 		Op:   "open",               // Operation that caused the error
-// 		Path: "/sys/class/fc_host", // Path where the error occurred
-// 		Err:  syscall.ENOENT,       // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
-// 	}
-// 	_, err := GetFCHostPortWWNs(context.Background())
-// 	assert.Equal(t, expectErr, err)
-// }
-
 func TestIssueLIPToAllFCHosts(t *testing.T) {
-	err := IssueLIPToAllFCHosts(context.Background())
-	assert.Equal(t, nil, err)
+	tempDir := t.TempDir()
+	fcHostsDir = tempDir
+	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
+
+	fs := &FS{}
+
+	tests := []struct {
+		name       string
+		hosts      map[string]string
+		shouldFail bool
+	}{
+		{
+			name: "Single host",
+			hosts: map[string]string{
+				"host1": "1",
+			},
+			shouldFail: false,
+		},
+		{
+			name: "Multiple hosts",
+			hosts: map[string]string{
+				"host1": "1",
+				"host2": "1",
+			},
+			shouldFail: false,
+		},
+		{
+			name:       "No hosts",
+			hosts:      map[string]string{},
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock hosts and issue_lip files
+
+			for host, lip := range tt.hosts {
+				hostDir := filepath.Join(fcHostsDir, host)
+				require.NoError(t, os.MkdirAll(hostDir, 0o755))
+				lipFile := filepath.Join(hostDir, "issue_lip")
+				require.NoError(t, os.WriteFile(lipFile, []byte(lip), 0o200))
+			}
+
+			// Call the function
+			err := fs.issueLIPToAllFCHosts(context.Background())
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
+
+func TestGetFCHostPortWWNs(t *testing.T) {
+	tempDir := t.TempDir()
+	fcHostsDir = tempDir // Use the temporary directory for testing
+	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
+
+	fs := &FS{}
+
+	tests := []struct {
+		name       string
+		entries    map[string]string
+		expected   []string
+		shouldFail bool
+	}{
+		{
+			name: "Single entry",
+			entries: map[string]string{
+				"host1/port_name": "0x500143802426baf7",
+			},
+			expected: []string{"0x500143802426baf7"},
+		},
+		{
+			name: "Multiple entries",
+			entries: map[string]string{
+				"host1/port_name": "0x500143802426baf7",
+				"host2/port_name": "0x500143802426baf8",
+			},
+			expected: []string{"0x500143802426baf7", "0x500143802426baf8"},
+		},
+		{
+			name:       "No matching entries",
+			entries:    map[string]string{},
+			expected:   []string{},
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock port_name files
+			createdEntries := []string{}
+			for entry, content := range tt.entries {
+				filePath := filepath.Join(fcHostsDir, entry)
+				require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+				createdEntries = append(createdEntries, filePath)
+			}
+
+			// Call the function with the test input
+			result, err := fs.getFCHostPortWWNs(context.Background())
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tt.expected, result)
+			}
+
+			// Cleanup created entries
+			for _, entry := range createdEntries {
+				require.NoError(t, os.Remove(entry), "failed to clean up test entry")
+			}
+		})
+	}
+}
+
+func TestGetIscsiTargetHosts(t *testing.T) {
+	tempDir := t.TempDir()
+	sessionsdir = tempDir // Use the temporary directory for testing
+	require.NoError(t, os.MkdirAll(sessionsdir, 0o755))
+
+	tests := []struct {
+		name       string
+		targets    []string
+		entries    map[string]string
+		expected   []*targetdev
+		shouldFail bool
+	}{
+		{
+			name:    "Single target",
+			targets: []string{"iqn.1992-04.com.emc:600009700bcbb70e3287017400000000"},
+			entries: map[string]string{
+				"session1/targetname":         "iqn.1992-04.com.emc:600009700bcbb70e3287017400000000",
+				"session1/device/target0:0:0": "",
+			},
+			expected: []*targetdev{
+				{host: "host0", channel: "0", target: "0"},
+			},
+		},
+		{
+			name:    "Multiple targets",
+			targets: []string{"iqn.1992-04.com.emc:600009700bcbb70e3287017400000000", "iqn.1992-04.com.emc:600009700bcbb70e3287017400000001"},
+			entries: map[string]string{
+				"session1/targetname":         "iqn.1992-04.com.emc:600009700bcbb70e3287017400000000",
+				"session1/device/target0:0:0": "",
+				"session2/targetname":         "iqn.1992-04.com.emc:600009700bcbb70e3287017400000001",
+				"session2/device/target1:0:0": "",
+			},
+			expected: []*targetdev{
+				{host: "host0", channel: "0", target: "0"},
+				{host: "host1", channel: "0", target: "0"},
+			},
+		},
+		{
+			name:       "No matching targets",
+			targets:    []string{"iqn.1992-04.com.emc:600009700bcbb70e3287017400000002"},
+			entries:    map[string]string{},
+			expected:   []*targetdev{},
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock targetname and device files
+			for entry, content := range tt.entries {
+				filePath := filepath.Join(sessionsdir, entry)
+				require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+			}
+
+			// Call the function with the test input
+			result, err := getIscsiTargetHosts(tt.targets)
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetFCTargetHosts(t *testing.T) {
+	tempDir := t.TempDir()
+	fcRemotePortsDir = tempDir // Use the temporary directory for testing
+	require.NoError(t, os.MkdirAll(fcRemotePortsDir, 0o755))
+
+	tests := []struct {
+		name       string
+		targets    []string
+		entries    map[string]string
+		expected   []*targetdev
+		shouldFail bool
+	}{
+		{
+			name:    "Single target",
+			targets: []string{"0x50060160c46036a0"},
+			entries: map[string]string{
+				"rport-0:0/port_name": "0x50060160c46036a0",
+			},
+			expected: []*targetdev{
+				{host: "host0", channel: "-", target: "-"},
+			},
+		},
+		{
+			name:    "Multiple targets",
+			targets: []string{"0x50060160c46036a0", "0x50060160c46036a1"},
+			entries: map[string]string{
+				"rport-0:0/port_name": "0x50060160c46036a0",
+				"rport-1:0/port_name": "0x50060160c46036a1",
+			},
+			expected: []*targetdev{
+				{host: "host0", channel: "-", target: "-"},
+				{host: "host1", channel: "-", target: "-"},
+			},
+		},
+		{
+			name:       "No matching targets",
+			targets:    []string{"0x50060160c46036a2"},
+			entries:    map[string]string{},
+			expected:   []*targetdev{},
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock port_name files
+			for entry, content := range tt.entries {
+				filePath := filepath.Join(fcRemotePortsDir, entry)
+				require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+			}
+
+			// Call the function with the test input
+			result, err := getFCTargetHosts(tt.targets)
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+// func TestRemoveBlockDevice(t *testing.T) {
+// 	tempDir := t.TempDir()
+// 	fcRemotePortsDir = tempDir // Use the temporary directory for testing
+// 	require.NoError(t, os.MkdirAll(fcRemotePortsDir, 0o755))
+// 	fs := &FS{}
+
+// 	tests := []struct {
+// 		name            string
+// 		blockDevicePath string
+// 		stateContent    string
+// 		expectedError   string
+// 	}{
+// 		{
+// 			name:            "Successful removal",
+// 			blockDevicePath: filepath.Join(tempDir, "dev/sda"),
+// 			stateContent:    "running",
+// 			expectedError:   "",
+// 		},
+// 		{
+// 			name:            "Device in blocked state",
+// 			blockDevicePath: filepath.Join(tempDir, "dev/sdb"),
+// 			stateContent:    "blocked",
+// 			expectedError:   "Device sdb is in blocked state",
+// 		},
+// 		{
+// 			name:            "State file not found",
+// 			blockDevicePath: filepath.Join(tempDir, "dev/sdc"),
+// 			expectedError:   "Cannot read /sys/block/sdc/device/state",
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			deviceName := filepath.Base(tt.blockDevicePath)
+// 			sysBlockDir := filepath.Join(tempDir, "sys/block", deviceName, "device")
+// 			require.NoError(t, os.MkdirAll(sysBlockDir, 0o755))
+
+// 			if tt.stateContent != "" {
+// 				statePath := filepath.Join(sysBlockDir, "state")
+// 				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o644))
+// 			}
+
+// 			deletePath := filepath.Join(sysBlockDir, "delete")
+// 			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o644))
+
+// 			err := fs.removeBlockDevice(context.Background(), tt.blockDevicePath)
+// 			if tt.expectedError != "" {
+// 				assert.Contains(t, err.Error(), tt.expectedError)
+// 			} else {
+// 				assert.NoError(t, err)
+// 				content, err := os.ReadFile(deletePath)
+// 				assert.NoError(t, err)
+// 				assert.Equal(t, "1", string(content))
+// 			}
+// 		})
+// 	}
+// }
