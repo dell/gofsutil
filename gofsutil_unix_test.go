@@ -188,6 +188,81 @@ func TestWWNToDevicePath(t *testing.T) {
 	}
 }
 
+func TestTargetIPLUNToDevicePath(t *testing.T) {
+	require.NoError(t, os.MkdirAll(bypathdir, 0o755))
+
+	fs := &FS{}
+
+	tests := []struct {
+		name       string
+		targetIP   string
+		lunID      int
+		entries    map[string]string
+		expected   map[string]string
+		shouldFail bool
+	}{
+		{
+			name:     "Single entry",
+			targetIP: "1.1.1.1",
+			lunID:    0,
+			entries: map[string]string{
+				"ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0": "../../sdc",
+			},
+			expected: map[string]string{
+				filepath.Join(bypathdir, "ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0"): "/dev/sdc",
+			},
+		},
+		{
+			name:     "Multiple entries",
+			targetIP: "1.1.1.1",
+			lunID:    1,
+			entries: map[string]string{
+				"ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-1":                  "../../sdd",
+				"ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0x0001000000000000": "../../sde",
+			},
+			expected: map[string]string{
+				filepath.Join(bypathdir, "ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-1"):                  "/dev/sdd",
+				filepath.Join(bypathdir, "ip-1.1.1.1:3260-iscsi-iqn.1992-04.com.emc:600009700bcbb70e3287017400000000-lun-0x0001000000000000"): "/dev/sde",
+			},
+		},
+		{
+			name:       "No matching entries",
+			targetIP:   "2.2.2.2",
+			lunID:      0,
+			entries:    map[string]string{},
+			expected:   map[string]string{},
+			shouldFail: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock symlinks
+			createdEntries := []string{}
+			for entry, target := range tt.entries {
+				symlinkPath := filepath.Join(bypathdir, entry)
+				require.NoError(t, os.MkdirAll(filepath.Dir(symlinkPath), 0o755))
+				require.NoError(t, os.Symlink(target, symlinkPath))
+				createdEntries = append(createdEntries, symlinkPath)
+			}
+
+			// Call the function with the test input
+			result, err := fs.targetIPLUNToDevicePath(context.Background(), tt.targetIP, tt.lunID)
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+
+			// Cleanup created entries
+			for _, entry := range createdEntries {
+				require.NoError(t, os.Remove(entry), "failed to clean up test entry")
+			}
+		})
+	}
+}
+
 func TestValidateMountArgs(t *testing.T) {
 	tests := []struct {
 		testname string

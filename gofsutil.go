@@ -89,6 +89,7 @@ var (
 	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc}
 
 	multipathDevDiskByID = "/dev/disk/by-id/"
+	bypathdir            = "/dev/disk/by-path"
 )
 
 // ContextKey is a variable containing context-keys

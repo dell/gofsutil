@@ -237,10 +237,10 @@ func (fs *FS) wwnToDevicePath(
 // targetIPLUNToDevicePath returns all the /dev/disk/by-path entries for a give targetIP and lunID
 func (fs *FS) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID int) (map[string]string, error) {
 	result := make(map[string]string, 0)
-	bypathdir := "/dev/disk/by-path"
+
 	entries, err := os.ReadDir(bypathdir)
 	if err != nil {
-		log.Printf("/dev/disk/by-path not found: %s", err.Error())
+		log.Printf("%s not found: %s", bypathdir, err.Error())
 		return result, err
 	}
 	// Loop through the entries
