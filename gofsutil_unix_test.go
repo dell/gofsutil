@@ -616,7 +616,7 @@ func TestGetFCHostPortWWNs(t *testing.T) {
 			for entry, content := range tt.entries {
 				filePath := filepath.Join(fcHostsDir, entry)
 				require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
-				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
 				createdEntries = append(createdEntries, filePath)
 			}
 
@@ -689,7 +689,7 @@ func TestGetIscsiTargetHosts(t *testing.T) {
 			for entry, content := range tt.entries {
 				filePath := filepath.Join(sessionsdir, entry)
 				require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
-				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
 			}
 
 			// Call the function with the test input
@@ -753,7 +753,7 @@ func TestGetFCTargetHosts(t *testing.T) {
 			for entry, content := range tt.entries {
 				filePath := filepath.Join(fcRemotePortsDir, entry)
 				require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0o755))
-				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+				require.NoError(t, os.WriteFile(filePath, []byte(content), 0o600))
 			}
 
 			// Call the function with the test input
@@ -807,11 +807,11 @@ func TestGetFCTargetHosts(t *testing.T) {
 
 // 			if tt.stateContent != "" {
 // 				statePath := filepath.Join(sysBlockDir, "state")
-// 				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o644))
+// 				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o600))
 // 			}
 
 // 			deletePath := filepath.Join(sysBlockDir, "delete")
-// 			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o644))
+// 			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o600))
 
 // 			err := fs.removeBlockDevice(context.Background(), tt.blockDevicePath)
 // 			if tt.expectedError != "" {
