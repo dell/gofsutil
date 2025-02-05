@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -894,4 +895,58 @@ func TestFSRescanSCSIHost(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMockIssueLIPToAllFCHosts(t *testing.T) {
+	fs := &mockfs{}
+	ctx := context.Background()
+
+	// Test case: No error induced
+	GOFSMock.InduceIssueLipError = false
+	err := fs.IssueLIPToAllFCHosts(ctx)
+	assert.NoError(t, err)
+
+	// Test case: Error induced
+	GOFSMock.InduceIssueLipError = true
+	err = fs.IssueLIPToAllFCHosts(ctx)
+	assert.Error(t, err)
+	assert.Equal(t, "induced error", err.Error())
+}
+
+func TestMockGetFCHostPortWWNs(t *testing.T) {
+	fs := &mockfs{}
+	ctx := context.Background()
+
+	// Test case: No error induced
+	GOFSMock.InduceFCHostWWNsError = false
+	_, err := fs.GetFCHostPortWWNs(ctx)
+	assert.NoError(t, err)
+
+	// Test case: Error induced
+	GOFSMock.InduceFCHostWWNsError = true
+	_, err = fs.GetFCHostPortWWNs(ctx)
+	assert.Error(t, err)
+	assert.Equal(t, "induced error", err.Error())
+}
+
+func TestMockMultipathCommand(t *testing.T) {
+	fs := &mockfs{}
+	ctx := context.Background()
+	timeout := 10 * time.Second
+	chroot := "/some/path"
+	args := []string{"arg1", "arg2"}
+
+	// Test case: No error induced
+	GOFSMock.InduceMultipathCommandError = false
+	output, err := fs.MultipathCommand(ctx, timeout, chroot, args...)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte{}, output)
+	// assert.NotNil(t, GOFSMock.GOFSMockWWNToDevice)
+
+	// Test case: Error induced
+	GOFSMock.InduceMultipathCommandError = true
+	output, err = fs.MultipathCommand(ctx, timeout, chroot, args...)
+	assert.Error(t, err)
+	assert.Equal(t, "multipath command induced error", err.Error())
+	assert.Equal(t, []byte{}, output)
 }
