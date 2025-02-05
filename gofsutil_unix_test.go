@@ -202,7 +202,7 @@ func TestTargetIPLUNToDevicePath(t *testing.T) {
 			}
 
 			// Call the function with the test input
-			result, err := fs.targetIPLUNToDevicePath(context.Background(), tt.targetIP, tt.lunID)
+			result, err := fs.TargetIPLUNToDevicePath(context.Background(), tt.targetIP, tt.lunID)
 			if tt.shouldFail {
 				assert.Error(t, err)
 			} else {
@@ -324,7 +324,7 @@ func TestUnMount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
 			fs := FS{}
-			err := fs.unmount(tt.ctx, tt.target)
+			err := fs.Unmount(tt.ctx, tt.target)
 			assert.Equal(t, true, strings.Contains(err.Error(), tt.expect))
 		})
 	}
@@ -354,7 +354,7 @@ func TestMultipathCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.testname, func(t *testing.T) {
 			fs := FS{}
-			_, err := fs.multipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments...)
+			_, err := fs.MultipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments...)
 			assert.Equal(t, tt.expectErr, err)
 		})
 	}
@@ -526,7 +526,7 @@ func TestIssueLIPToAllFCHosts(t *testing.T) {
 			}
 
 			// Call the function
-			err := fs.issueLIPToAllFCHosts(context.Background())
+			err := fs.IssueLIPToAllFCHosts(context.Background())
 			if tt.shouldFail {
 				assert.Error(t, err)
 			} else {
@@ -584,7 +584,7 @@ func TestGetFCHostPortWWNs(t *testing.T) {
 			}
 
 			// Call the function with the test input
-			result, err := fs.getFCHostPortWWNs(context.Background())
+			result, err := fs.GetFCHostPortWWNs(context.Background())
 			if tt.shouldFail {
 				assert.Error(t, err)
 			} else {
