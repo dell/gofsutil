@@ -214,11 +214,12 @@ func (fs *FS) wwnToDevicePath(
 
 	// Look for nvme path device.
 	if err != nil || devPath == "" {
-		symlinkPath = fmt.Sprintf("/dev/disk/by-id/nvme-eui.%s", wwn)
+		symlinkPath = filepath.Join(multipathDevDiskByID, fmt.Sprintf("nvme-eui.%s", wwn))
 		devPath, err = os.Readlink(symlinkPath)
 		if err != nil || devPath == "" {
 			// Look for normal path device
-			symlinkPath = fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+			symlinkPath = filepath.Join(multipathDevDiskByID, fmt.Sprintf("wwn-0x%s", wwn))
+
 			devPath, err = os.Readlink(symlinkPath)
 			if err != nil {
 				log.Printf("Check for disk path %s not found", symlinkPath)
@@ -236,10 +237,10 @@ func (fs *FS) wwnToDevicePath(
 // targetIPLUNToDevicePath returns all the /dev/disk/by-path entries for a give targetIP and lunID
 func (fs *FS) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID int) (map[string]string, error) {
 	result := make(map[string]string, 0)
-	bypathdir := "/dev/disk/by-path"
+
 	entries, err := os.ReadDir(bypathdir)
 	if err != nil {
-		log.Printf("/dev/disk/by-path not found: %s", err.Error())
+		log.Printf("%s not found: %s", bypathdir, err.Error())
 		return result, err
 	}
 	// Loop through the entries
@@ -383,7 +384,6 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 		return targetDev, nil
 	}
 	// Read the directory entries for fc_remote_ports
-	fcRemotePortsDir := "/sys/class/fc_remote_ports"
 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcRemotePortsDir)
@@ -438,7 +438,6 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 		return targetDev, nil
 	}
 	// Read the sessions.
-	sessionsdir := "/sys/class/iscsi_session"
 	sessions, err := os.ReadDir(sessionsdir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
@@ -587,7 +586,6 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 	portWWNs := make([]string, 0)
 	// Read the directory entries for fc_remote_ports
-	fcHostsDir := "/sys/class/fc_host"
 	hostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
@@ -614,7 +612,6 @@ func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 	var savedError error
 	// Read the directory entries for fc_remote_ports
-	fcHostsDir := "/sys/class/fc_host"
 	fcHostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
@@ -650,9 +647,9 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	start := time.Now()
 	result := make([]string, 0)
-	sysBlocks, err := os.ReadDir(fs.SysBlockDir)
+	sysBlocks, err := os.ReadDir(SysBlockDir)
 	if err != nil {
-		return result, fmt.Errorf("Error reading %s: %s", fs.SysBlockDir, err)
+		return result, fmt.Errorf("Error reading %s: %s", SysBlockDir, err)
 	}
 
 	for _, sysBlock := range sysBlocks {
@@ -665,9 +662,9 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string
 		// Set the WWID path based on the device type
 		var wwidPath string
 		if strings.HasPrefix(name, "nvme") {
-			wwidPath = fs.SysBlockDir + "/" + name + "/wwid" // For NVMe devices
+			wwidPath = SysBlockDir + "/" + name + "/wwid" // For NVMe devices
 		} else {
-			wwidPath = fs.SysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
+			wwidPath = SysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
 		}
 
 		bytes, err := os.ReadFile(filepath.Clean(wwidPath))
@@ -746,7 +743,7 @@ func wwnMatches(nguid, wwn string) bool {
 
 // GetNVMeController retrieves the NVMe controller for a given NVMe device.
 func (fs *FS) getNVMeController(device string) (string, error) {
-	devicePath := filepath.Join(fs.SysBlockDir, device)
+	devicePath := filepath.Join(SysBlockDir, device)
 
 	// Check if the device path exists
 	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
