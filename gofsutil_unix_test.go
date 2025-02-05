@@ -30,43 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// func TestFCRescanSCSIHost(t *testing.T) {
-// 	var targets []string
-// 	// Scan the remote ports to find the array port WWNs
-// 	fcRemotePortsDir := "/sys/class/fc_remote_ports"
-// 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
-// 	if err != nil {
-// 		t.Errorf("error reading %s: %s", fcRemotePortsDir, err)
-// 	}
-// 	for _, remotePort := range remotePortEntries {
-// 		if !strings.HasPrefix(remotePort.Name(), "rport-") {
-// 			continue
-// 		}
-
-// 		if !strings.HasPrefix(remotePort.Name(), "rport-") {
-// 			continue
-// 		}
-
-// 		arrayPortNameBytes, err := os.ReadFile(fcRemotePortsDir + "/" + remotePort.Name() + "/" + "port_name")
-// 		if err != nil {
-// 			continue
-// 		}
-// 		arrayPortName := strings.TrimSpace(string(arrayPortNameBytes))
-// 		if !strings.HasPrefix(arrayPortName, gofsutil.FCPortPrefix) {
-// 			continue
-// 		}
-// 		targets = append(targets, arrayPortName)
-
-// 	}
-
-// 	if len(targets) > 0 {
-// 		err := gofsutil.RescanSCSIHost(context.Background(), targets, "1")
-// 		if err != nil {
-// 			t.Errorf("RescanSCSIHost failed: %s", err)
-// 		}
-// 	}
-// }
-
 func TestMountArgs(t *testing.T) {
 	tests := []struct {
 		src    string
@@ -767,61 +730,3 @@ func TestGetFCTargetHosts(t *testing.T) {
 		})
 	}
 }
-
-// func TestRemoveBlockDevice(t *testing.T) {
-// 	tempDir := t.TempDir()
-// 	fcRemotePortsDir = tempDir // Use the temporary directory for testing
-// 	require.NoError(t, os.MkdirAll(fcRemotePortsDir, 0o755))
-// 	fs := &FS{}
-
-// 	tests := []struct {
-// 		name            string
-// 		blockDevicePath string
-// 		stateContent    string
-// 		expectedError   string
-// 	}{
-// 		{
-// 			name:            "Successful removal",
-// 			blockDevicePath: filepath.Join(tempDir, "dev/sda"),
-// 			stateContent:    "running",
-// 			expectedError:   "",
-// 		},
-// 		{
-// 			name:            "Device in blocked state",
-// 			blockDevicePath: filepath.Join(tempDir, "dev/sdb"),
-// 			stateContent:    "blocked",
-// 			expectedError:   "Device sdb is in blocked state",
-// 		},
-// 		{
-// 			name:            "State file not found",
-// 			blockDevicePath: filepath.Join(tempDir, "dev/sdc"),
-// 			expectedError:   "Cannot read /sys/block/sdc/device/state",
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			deviceName := filepath.Base(tt.blockDevicePath)
-// 			sysBlockDir := filepath.Join(tempDir, "sys/block", deviceName, "device")
-// 			require.NoError(t, os.MkdirAll(sysBlockDir, 0o755))
-
-// 			if tt.stateContent != "" {
-// 				statePath := filepath.Join(sysBlockDir, "state")
-// 				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o600))
-// 			}
-
-// 			deletePath := filepath.Join(sysBlockDir, "delete")
-// 			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o600))
-
-// 			err := fs.removeBlockDevice(context.Background(), tt.blockDevicePath)
-// 			if tt.expectedError != "" {
-// 				assert.Contains(t, err.Error(), tt.expectedError)
-// 			} else {
-// 				assert.NoError(t, err)
-// 				content, err := os.ReadFile(deletePath)
-// 				assert.NoError(t, err)
-// 				assert.Equal(t, "1", string(content))
-// 			}
-// 		})
-// 	}
-// }
