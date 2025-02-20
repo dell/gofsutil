@@ -1,12 +1,12 @@
 name: Release GoFSUtil
 # Invocable as a reusable workflow
 # Can be manually triggered
-on: # yamllint disable-line rule:truthy
+on:  # yamllint disable-line rule:truthy
   workflow_call:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (major, minor, patch) Ex: 1.0.0"
+        description: 'Version to release (major, minor, patch) Ex: 1.0.0'
         required: true
   repository_dispatch:
     types: [release-go-libs]
