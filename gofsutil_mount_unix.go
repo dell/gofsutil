@@ -331,7 +331,7 @@ func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) er
 			}
 			errs := f.Close()
 			if errs != nil {
-				return err
+				return errs
 			}
 		}
 		return nil
@@ -363,7 +363,7 @@ func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) er
 		}
 		errs := f.Close()
 		if errs != nil {
-			return err
+			return errs
 		}
 	}
 	return nil
@@ -640,7 +640,7 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 		}
 		errs := f.Close()
 		if errs != nil {
-			return err
+			return errs
 		}
 	}
 	return savedError
