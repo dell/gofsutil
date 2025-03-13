@@ -89,6 +89,84 @@ var (
 	fs FSinterface = &FS{ScanEntry: defaultEntryScanFunc, SysBlockDir: "/sys/block"}
 )
 
+var (
+	getGofsutilGetDiskFormat = func(fs FSinterface, ctx context.Context, disk string) (string, error) {
+		return fs.GetDiskFormat(ctx, disk)
+	}
+	getGofsutilFormatAndMount = func(fs FSinterface, ctx context.Context, source string, target string, fsType string, options ...string) error {
+		return fs.FormatAndMount(ctx, source, target, fsType, options...)
+	}
+	getGofsutilFormat = func(fs FSinterface, ctx context.Context, source string, target string, fsType string, options ...string) error {
+		return fs.Format(ctx, source, target, fsType, options...)
+	}
+	getGofsutilMount = func(fs FSinterface, ctx context.Context, source string, target string, fsType string, options ...string) error {
+		return fs.Mount(ctx, source, target, fsType, options...)
+	}
+	getGofsutilBindMount = func(fs FSinterface, ctx context.Context, source string, target string, options ...string) error {
+		return fs.BindMount(ctx, source, target, options...)
+	}
+	getGofsutilUnmount = func(fs FSinterface, ctx context.Context, target string) error {
+		return fs.Unmount(ctx, target)
+	}
+	getGofsutilGetMountInfoFromDevice = func(fs FSinterface, ctx context.Context, devID string) (*DeviceMountInfo, error) {
+		return fs.GetMountInfoFromDevice(ctx, devID)
+	}
+	getGofsutilGetMpathNameFromDevice = func(fs FSinterface, ctx context.Context, device string) (string, error) {
+		return fs.getMpathNameFromDevice(ctx, device)
+	}
+	getGofsutilGetResizeFS = func(fs FSinterface, ctx context.Context, volumePath string, devicePath string, ppathDevice string, mpathDevice string, fsType string) error {
+		return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
+	}
+	getResizeMultipath = func(fs FSinterface, ctx context.Context, deviceName string) error {
+		return fs.resizeMultipath(ctx, deviceName)
+	}
+	getFindFSType = func(fs FSinterface, ctx context.Context, mountpoint string) (string, error) {
+		return fs.findFSType(ctx, mountpoint)
+	}
+	getDeviceRescan = func(fs FSinterface, ctx context.Context, devicePath string) error {
+		return fs.deviceRescan(ctx, devicePath)
+	}
+	getMounts = func(fs FSinterface, ctx context.Context) ([]Info, error) {
+		return fs.GetMounts(ctx)
+	}
+	getDevMounts = func(fs FSinterface, ctx context.Context, dev string) ([]Info, error) {
+		return fs.GetDevMounts(ctx, dev)
+	}
+	getValidateDevice = func(fs FSinterface, ctx context.Context, source string) (string, error) {
+		return fs.ValidateDevice(ctx, source)
+	}
+	getWWNToDevicePath = func(fs FSinterface, ctx context.Context, wwn string) (string, string, error) {
+		return fs.WWNToDevicePath(ctx, wwn)
+	}
+	getRescanSCSIHost = func(fs FSinterface, ctx context.Context, targets []string, lun string) error {
+		return fs.RescanSCSIHost(ctx, targets, lun)
+	}
+	getRemoveBlockDevice = func(fs FSinterface, ctx context.Context, blockDevicePath string) error {
+		return fs.RemoveBlockDevice(ctx, blockDevicePath)
+	}
+	getMultipathCommand = func(fs FSinterface, ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+		return fs.MultipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+	}
+	getTargetIPLUNToDevicePath = func(fs FSinterface, ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
+		return fs.TargetIPLUNToDevicePath(ctx, targetIP, lunID)
+	}
+	getFCHostPortWWNs = func(fs FSinterface, ctx context.Context) ([]string, error) {
+		return fs.GetFCHostPortWWNs(ctx)
+	}
+	getIssueLIPToAllFCHosts = func(fs FSinterface, ctx context.Context) error {
+		return fs.IssueLIPToAllFCHosts(ctx)
+	}
+	getSysBlockDevicesForVolumeWWN = func(fs FSinterface, ctx context.Context, volumeWWN string) ([]string, error) {
+		return fs.GetSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
+	}
+	getFsInfo = func(fs FSinterface, ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
+		return fs.fsInfo(ctx, path)
+	}
+	getNVMeController = func(fs FSinterface, device string) (string, error) {
+		return fs.getNVMeController(device)
+	}
+)
+
 // ContextKey is a variable containing context-keys
 type ContextKey string
 
@@ -109,7 +187,7 @@ func UseMockSysBlockDir(mockSysBlockDir string) {
 
 // GetDiskFormat uses 'lsblk' to see if the given disk is unformatted.
 func GetDiskFormat(ctx context.Context, disk string) (string, error) {
-	return fs.GetDiskFormat(ctx, disk)
+	return getGofsutilGetDiskFormat(fs, ctx, disk)
 }
 
 // FormatAndMount uses unix utils to format and mount the given disk.
@@ -118,7 +196,8 @@ func FormatAndMount(
 	source, target, fsType string,
 	opts ...string,
 ) error {
-	return fs.FormatAndMount(ctx, source, target, fsType, opts...)
+
+	return getGofsutilFormatAndMount(fs, ctx, source, target, fsType, opts...)
 }
 
 // Format uses unix utils to format the given disk.
@@ -127,7 +206,7 @@ func Format(
 	source, target, fsType string,
 	opts ...string,
 ) error {
-	return fs.Format(ctx, source, target, fsType, opts...)
+	return getGofsutilFormat(fs, ctx, source, target, fsType, opts...)
 }
 
 // Mount mounts source to target as fstype with given options.
@@ -144,7 +223,7 @@ func Mount(
 	source, target, fsType string,
 	opts ...string,
 ) error {
-	return fs.Mount(ctx, source, target, fsType, opts...)
+	return getGofsutilMount(fs, ctx, source, target, fsType, opts...)
 }
 
 // BindMount behaves like Mount was called with a "bind" flag set
@@ -154,12 +233,12 @@ func BindMount(
 	source, target string,
 	opts ...string,
 ) error {
-	return fs.BindMount(ctx, source, target, opts...)
+	return getGofsutilBindMount(fs, ctx, source, target, opts...)
 }
 
 // Unmount unmounts the target.
 func Unmount(ctx context.Context, target string) error {
-	return fs.Unmount(ctx, target)
+	return getGofsutilUnmount(fs, ctx, target)
 }
 
 // GetMountInfoFromDevice retrieves mount information associated with the volume
@@ -169,7 +248,7 @@ func GetMountInfoFromDevice(ctx context.Context, devID string) (*DeviceMountInfo
 
 // GetMpathNameFromDevice retrieves mpath device name from device name
 func GetMpathNameFromDevice(ctx context.Context, device string) (string, error) {
-	return fs.getMpathNameFromDevice(ctx, device)
+	return getGofsutilGetMpathNameFromDevice(fs, ctx, device)
 }
 
 // ResizeFS expands the filesystem to the new size of underlying device
@@ -178,26 +257,26 @@ func ResizeFS(
 	volumePath, devicePath, ppathDevice,
 	mpathDevice, fsType string,
 ) error {
-	return fs.resizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
+	return getGofsutilGetResizeFS(fs, ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType)
 }
 
 // ResizeMultipath expands the multipath volumes
 func ResizeMultipath(ctx context.Context, deviceName string) error {
-	return fs.resizeMultipath(ctx, deviceName)
+	return getResizeMultipath(fs, ctx, deviceName)
 }
 
 // FindFSType fetches the filesystem type on mountpoint
 func FindFSType(
 	ctx context.Context, mountpoint string,
 ) (fsType string, err error) {
-	return fs.findFSType(ctx, mountpoint)
+	return getFindFSType(fs, ctx, mountpoint)
 }
 
 // DeviceRescan rescan the device for size alterations
 func DeviceRescan(ctx context.Context,
 	devicePath string,
 ) error {
-	return fs.deviceRescan(ctx, devicePath)
+	return getDeviceRescan(fs, ctx, devicePath)
 }
 
 // GetMounts returns a slice of all the mounted filesystems.
@@ -214,12 +293,12 @@ func DeviceRescan(ctx context.Context,
 //	  - Darwin hosts parse the output of the "mount" command to obtain
 //	    mount information.
 func GetMounts(ctx context.Context) ([]Info, error) {
-	return fs.GetMounts(ctx)
+	return getMounts(fs, ctx)
 }
 
 // GetDevMounts returns a slice of all mounts for the provided device.
 func GetDevMounts(ctx context.Context, dev string) ([]Info, error) {
-	return fs.GetDevMounts(ctx, dev)
+	return getDevMounts(fs, ctx, dev)
 }
 
 // EvalSymlinks evaluates the provided path and updates it to remove
@@ -239,20 +318,20 @@ func EvalSymlinks(_ context.Context, symPath *string) error {
 // evaluated and returned as an absolute path without any symlinks.
 // Otherwise an empty string is returned.
 func ValidateDevice(ctx context.Context, source string) (string, error) {
-	return fs.ValidateDevice(ctx, source)
+	return getValidateDevice(fs, ctx, source)
 }
 
 // WWNToDevicePath returns the device path corresponding to a LUN's WWN
 // (World Wide Name). A null path is returned if the device isn't found.
 func WWNToDevicePath(ctx context.Context, wwn string) (string, error) {
-	_, path, err := fs.WWNToDevicePath(ctx, wwn)
+	_, path, err := getWWNToDevicePath(fs, ctx, wwn)
 	return path, err
 }
 
 // WWNToDevicePathX returns the symlink and device path corresponding to a LUN's WWN
 // (World Wide Name). A null path is returned if the device isn't found.
 func WWNToDevicePathX(ctx context.Context, wwn string) (string, string, error) {
-	return fs.WWNToDevicePath(ctx, wwn)
+	return getWWNToDevicePath(fs, ctx, wwn)
 }
 
 // RescanSCSIHost will rescan scsi hosts for a specified lun.
@@ -261,50 +340,50 @@ func WWNToDevicePathX(ctx context.Context, wwn string) (string, string, error) {
 // Targets must either begin with 0x50 for FC or iqn. for Iscsi.
 // If lun is specified, then the rescan is for that particular volume.
 func RescanSCSIHost(ctx context.Context, targets []string, lun string) error {
-	return fs.RescanSCSIHost(ctx, targets, lun)
+	return getRescanSCSIHost(fs, ctx, targets, lun)
 }
 
 // RemoveBlockDevice removes a block device by getting the device name
 // from the last component of the blockDevicePath and then removing the
 // device by writing '1' to /sys/block{deviceName}/device/delete
 func RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
-	return fs.RemoveBlockDevice(ctx, blockDevicePath)
+	return getRemoveBlockDevice(fs, ctx, blockDevicePath)
 }
 
 // MultipathCommand executes the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
 func MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
-	return fs.MultipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+	return getMultipathCommand(fs, ctx, timeoutSeconds, chroot, arguments...)
 }
 
 // TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP
 // and a LUN id. It returns the entry name in /dev/disk/by-path and the device path, along with error.
 func TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error) {
-	return fs.TargetIPLUNToDevicePath(ctx, targetIP, lunID)
+	return getTargetIPLUNToDevicePath(fs, ctx, targetIP, lunID)
 }
 
 // GetFCHostPortWWNs returns the Fibrechannel Port WWNs of the local host.
 func GetFCHostPortWWNs(ctx context.Context) ([]string, error) {
-	return fs.GetFCHostPortWWNs(ctx)
+	return getFCHostPortWWNs(fs, ctx)
 }
 
 // IssueLIPToAllFCHosts issues the LIP command to all FC hosts.
 func IssueLIPToAllFCHosts(ctx context.Context) error {
-	return fs.IssueLIPToAllFCHosts(ctx)
+	return getIssueLIPToAllFCHosts(fs, ctx)
 }
 
 // GetSysBlockDevicesForVolumeWWN given a volumeWWN will return a list of devices in /sys/block for that WWN (e.g. sdx, sdaa)
 func GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error) {
-	return fs.GetSysBlockDevicesForVolumeWWN(ctx, volumeWWN)
+	return getSysBlockDevicesForVolumeWWN(fs, ctx, volumeWWN)
 }
 
 // FsInfo given the path of the filesystem will return its stats
 func FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error) {
-	return fs.fsInfo(ctx, path)
+	return getFsInfo(fs, ctx, path)
 }
 
 // GetNVMeController retrieves the NVMe controller for a given NVMe device.
 func GetNVMeController(device string) (string, error) {
-	return fs.getNVMeController(device)
+	return getNVMeController(fs, device)
 }
