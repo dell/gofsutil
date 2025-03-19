@@ -517,7 +517,7 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 	devicePathComponents := strings.Split(blockDevicePath, "/")
 	if len(devicePathComponents) > 1 {
 		deviceName := devicePathComponents[len(devicePathComponents)-1]
-		statePath := fmt.Sprintf("/sys/block/%s/device/state", deviceName)
+		statePath := filepath.Join(SysBlockDir, fmt.Sprintf("%s/device/state", deviceName))
 		stateBytes, err := os.ReadFile(filepath.Clean(statePath))
 		if err != nil {
 			return fmt.Errorf("Cannot read %s: %s", statePath, err)
@@ -526,7 +526,7 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 		if deviceState == "blocked" {
 			return fmt.Errorf("Device %s is in blocked state", deviceName)
 		}
-		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
+		blockDeletePath := filepath.Join(SysBlockDir, fmt.Sprintf("%s/device/delete", deviceName))
 		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")

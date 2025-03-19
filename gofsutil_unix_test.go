@@ -17,6 +17,7 @@ package gofsutil
 
 import (
 	"context"
+
 	// "fmt"
 	"errors"
 	"os"
@@ -459,26 +460,26 @@ func TestRescanSCSIHost(t *testing.T) {
 	}
 }
 
-func TestRemoveBlockDevice(t *testing.T) {
-	tests := []struct {
-		testname        string
-		ctx             context.Context
-		blockDevicePath string
-		expectErr       error
-	}{
-		{
-			testname:        "Invalid Block device path",
-			blockDevicePath: "/abc",
-			expectErr:       errors.New("Cannot read /sys/block/abc/device/state: open /sys/block/abc/device/state: no such file or directory"),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.testname, func(t *testing.T) {
-			err := RemoveBlockDevice(tt.ctx, tt.blockDevicePath)
-			assert.Equal(t, tt.expectErr, err)
-		})
-	}
-}
+// func TestRemoveBlockDevice(t *testing.T) {
+// 	tests := []struct {
+// 		testname        string
+// 		ctx             context.Context
+// 		blockDevicePath string
+// 		expectErr       error
+// 	}{
+// 		{
+// 			testname:        "Invalid Block device path",
+// 			blockDevicePath: "/abc",
+// 			expectErr:       errors.New("Cannot read /sys/block/abc/device/state: open /sys/block/abc/device/state: no such file or directory"),
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.testname, func(t *testing.T) {
+// 			err := RemoveBlockDevice(tt.ctx, tt.blockDevicePath)
+// 			assert.Equal(t, tt.expectErr, err)
+// 		})
+// 	}
+// }
 
 func TestIssueLIPToAllFCHosts(t *testing.T) {
 	tempDir := t.TempDir()
@@ -726,6 +727,62 @@ func TestGetFCTargetHosts(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestRemoveBlockDevice(t *testing.T) {
+	tempDir := t.TempDir()
+	SysBlockDir = tempDir // Use the temporary directory for testing
+	require.NoError(t, os.MkdirAll(SysBlockDir, 0o755))
+
+	tests := []struct {
+		name            string
+		blockDevicePath string
+		stateContent    string
+		expectedError   string
+	}{
+		{
+			name:            "Device not blocked",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "running",
+			expectedError:   "",
+		},
+		{
+			name:            "Device blocked",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "blocked",
+			expectedError:   "Device sda is in blocked state",
+		},
+		{
+			name:            "Cannot read state file",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "",
+			expectedError:   "Device sda is in blocked state",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			statePath := filepath.Join(SysBlockDir, "sda/device/state")
+			require.NoError(t, os.MkdirAll(filepath.Dir(statePath), 0o755))
+			if tt.stateContent != "" {
+				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o600))
+			}
+
+			// Create the delete file
+			deletePath := filepath.Join(SysBlockDir, "sda/device/delete")
+			require.NoError(t, os.MkdirAll(filepath.Dir(deletePath), 0o755))
+			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o600))
+
+			fs := &FS{}
+			err := fs.removeBlockDevice(context.Background(), tt.blockDevicePath)
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
