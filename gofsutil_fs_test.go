@@ -953,16 +953,45 @@ func TestMockMultipathCommand(t *testing.T) {
 }
 
 func TestFS_GetDiskFormat(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-
-		format, err := fs.GetDiskFormat(context.Background(), "/dev/sda")
-
-		fmt.Print("format: ", format, err)
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
-		}
-
-	})
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx  context.Context
+		disk string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "Error Getting the disk format",
+			args: args{
+				ctx:  context.Background(),
+				disk: "test_device",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			got, err := fs.GetDiskFormat(tt.args.ctx, tt.args.disk)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.GetDiskFormat() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("FS.GetDiskFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestFS_FormatAndMount(t *testing.T) {
