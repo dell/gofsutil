@@ -44,6 +44,19 @@ var PowerMaxOUIPrefix = "6000097"
 
 // PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
 var PowerStoreOUIPrefix = "68ccf09"
+var (
+	isBindFunc = func(fs *FS, ctx context.Context, opts ...string) ([]string, bool) {
+		return fs.isBind(ctx, opts...)
+	}
+
+	bindMountFunc = func(fs *FS, ctx context.Context, source, target string, opts ...string) error {
+		return fs.bindMount(ctx, source, target, opts...)
+	}
+
+	doMountFunc = func(fs *FS, ctx context.Context, command, source, target, fsType string, opts ...string) error {
+		return fs.doMount(ctx, command, source, target, fsType, opts...)
+	}
+)
 
 func (fs *FS) mount(
 	ctx context.Context,
@@ -51,10 +64,10 @@ func (fs *FS) mount(
 	opts ...string,
 ) error {
 	// All Linux distributes should support bind mounts.
-	if opts, ok := fs.isBind(ctx, opts...); ok {
-		return fs.bindMount(ctx, source, target, opts...)
+	if opts, ok := isBindFunc(fs, ctx, opts...); ok {
+		return bindMountFunc(fs, ctx, source, target, opts...)
 	}
-	return fs.doMount(ctx, "mount", source, target, fsType, opts...)
+	return doMountFunc(fs, ctx, "mount", source, target, fsType, opts...)
 }
 
 // validateMountArgs validates the arguments for mount operation.
@@ -178,19 +191,33 @@ func (fs *FS) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
 	return mountInfos, nil
 }
 
+var (
+	lstatFunc = func(name string) (os.FileInfo, error) {
+		return os.Lstat(name)
+	}
+
+	evalSymlinksFunc = func(ctx context.Context, path *string) error {
+		return EvalSymlinks(ctx, path)
+	}
+
+	statFunc = func(name string) (os.FileInfo, error) {
+		return os.Stat(name)
+	}
+)
+
 func (fs *FS) validateDevice(
 	ctx context.Context, source string,
 ) (string, error) {
-	if _, err := os.Lstat(source); err != nil {
+	if _, err := lstatFunc(source); err != nil {
 		return "", err
 	}
 
 	// Eval symlinks to ensure the specified path points to a real device.
-	if err := EvalSymlinks(ctx, &source); err != nil {
+	if err := evalSymlinksFunc(ctx, &source); err != nil {
 		return "", err
 	}
 
-	st, err := os.Stat(source)
+	st, err := statFunc(source)
 	if err != nil {
 		return "", err
 	}
