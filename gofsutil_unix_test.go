@@ -91,6 +91,13 @@ func TestWWNToDevicePath(t *testing.T) {
 	tempDir := t.TempDir()
 	multipathDevDiskByID = tempDir
 	MultipathDevDiskByIDPrefix = filepath.Join(tempDir, "dm-uuid-mpath-3")
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(multipathDevDiskByID))
+		multipathDevDiskByID = "/dev/disk/by-id/"
+	}()
+
 	fs := &FS{}
 
 	tests := []struct {
@@ -147,6 +154,11 @@ func TestTargetIPLUNToDevicePath(t *testing.T) {
 	bypathdir = tempDir // Use the temporary directory for testing
 	require.NoError(t, os.MkdirAll(bypathdir, 0o755))
 
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(bypathdir))
+		bypathdir = "/dev/disk/by-path"
+	}()
 	fs := &FS{}
 
 	tests := []struct {
@@ -331,36 +343,6 @@ func TestUnMount(t *testing.T) {
 	}
 }
 
-func TestMultipathCommand(t *testing.T) {
-	tests := []struct {
-		testname       string
-		ctx            context.Context
-		timeoutSeconds time.Duration
-		chroot         string
-		arguments      []string
-		expectErr      error
-	}{
-		{
-			testname:       "Empty chroot",
-			timeoutSeconds: time.Duration(10),
-			chroot:         "",
-			arguments:      []string{"A", "iR"},
-			expectErr: &os.PathError{
-				Op:   "fork/exec",
-				Path: "/usr/sbin/multipath",
-				Err:  syscall.ENOENT,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.testname, func(t *testing.T) {
-			fs := FS{}
-			_, err := fs.MultipathCommand(tt.ctx, tt.timeoutSeconds, tt.chroot, tt.arguments...)
-			assert.Equal(t, tt.expectErr, err)
-		})
-	}
-}
-
 func TestIsBind(t *testing.T) {
 	tests := []struct {
 		testname string
@@ -481,66 +463,16 @@ func TestRemoveBlockDevice_Invalid(t *testing.T) {
 	}
 }
 
-func TestIssueLIPToAllFCHosts_Valid(t *testing.T) {
-	tempDir := t.TempDir()
-	fcHostsDir = tempDir
-	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
-
-	fs := &FS{}
-
-	tests := []struct {
-		name       string
-		hosts      map[string]string
-		shouldFail bool
-	}{
-		{
-			name: "Single host",
-			hosts: map[string]string{
-				"host1": "1",
-			},
-			shouldFail: false,
-		},
-		{
-			name: "Multiple hosts",
-			hosts: map[string]string{
-				"host1": "1",
-				"host2": "1",
-			},
-			shouldFail: false,
-		},
-		{
-			name:       "No hosts",
-			hosts:      map[string]string{},
-			shouldFail: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mock hosts and issue_lip files
-
-			for host, lip := range tt.hosts {
-				hostDir := filepath.Join(fcHostsDir, host)
-				require.NoError(t, os.MkdirAll(hostDir, 0o755))
-				lipFile := filepath.Join(hostDir, "issue_lip")
-				require.NoError(t, os.WriteFile(lipFile, []byte(lip), 0o200))
-			}
-
-			// Call the function
-			err := fs.IssueLIPToAllFCHosts(context.Background())
-			if tt.shouldFail {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestGetFCHostPortWWNs(t *testing.T) {
 	tempDir := t.TempDir()
 	fcHostsDir = tempDir // Use the temporary directory for testing
 	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(fcHostsDir))
+		fcHostsDir = "/sys/class/fc_host"
+	}()
 
 	fs := &FS{}
 
@@ -605,6 +537,12 @@ func TestGetIscsiTargetHosts(t *testing.T) {
 	tempDir := t.TempDir()
 	sessionsdir = tempDir // Use the temporary directory for testing
 	require.NoError(t, os.MkdirAll(sessionsdir, 0o755))
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(sessionsdir))
+		sessionsdir = "/sys/class/iscsi_session"
+	}()
 
 	tests := []struct {
 		name       string
@@ -673,6 +611,12 @@ func TestGetFCTargetHosts(t *testing.T) {
 	fcRemotePortsDir = tempDir // Use the temporary directory for testing
 	require.NoError(t, os.MkdirAll(fcRemotePortsDir, 0o755))
 
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(fcRemotePortsDir))
+		fcRemotePortsDir = "/sys/class/fc_remote_ports"
+	}()
+
 	tests := []struct {
 		name       string
 		targets    []string
@@ -736,6 +680,12 @@ func TestRemoveBlockDevice(t *testing.T) {
 	tempDir := t.TempDir()
 	SysBlockDir = tempDir // Use the temporary directory for testing
 	require.NoError(t, os.MkdirAll(SysBlockDir, 0o755))
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(SysBlockDir))
+		SysBlockDir = "/sys/block"
+	}()
 
 	tests := []struct {
 		name            string
@@ -813,6 +763,12 @@ func TestIssueLIPToAllFCHosts(t *testing.T) {
 	tempDir := t.TempDir()
 	fcHostsDir = tempDir
 	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(fcHostsDir))
+		fcHostsDir = "/sys/class/fc_host"
+	}()
 
 	fs := &FS{}
 
@@ -892,7 +848,7 @@ func TestIssueLIPToAllFCHosts(t *testing.T) {
 	}
 }
 
-func TestMultipathCommands(t *testing.T) {
+func TestMultipathCommand(t *testing.T) {
 	tests := []struct {
 		testname       string
 		timeoutSeconds time.Duration
@@ -1038,3 +994,129 @@ func TestMounts(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDevices(t *testing.T) {
+	originalLstatFunc := lstatFunc
+	originalEvalSymlinksFunc := evalSymlinksFunc
+	originalStatFunc := statFunc
+
+	defer func() {
+		lstatFunc = originalLstatFunc
+		evalSymlinksFunc = originalEvalSymlinksFunc
+		statFunc = originalStatFunc
+	}()
+
+	type testCase struct {
+		name       string
+		source     string
+		setupMocks func()
+		wantErr    bool
+		errMsg     string
+	}
+
+	testCases := []testCase{
+		{
+			name:   "Non-existent source",
+			source: "/nonexistent",
+			setupMocks: func() {
+				lstatFunc = func(name string) (os.FileInfo, error) {
+					return nil, os.ErrNotExist
+				}
+			},
+			wantErr: true,
+			errMsg:  "file does not exist",
+		},
+		{
+			name:   "Invalid symlink",
+			source: "/invalidsymlink",
+			setupMocks: func() {
+				lstatFunc = func(name string) (os.FileInfo, error) {
+					return nil, nil
+				}
+				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+					return os.ErrNotExist
+				}
+			},
+			wantErr: true,
+			errMsg:  "file does not exist",
+		},
+		{
+			name:   "Not a device",
+			source: "/notadevice",
+			setupMocks: func() {
+				lstatFunc = func(name string) (os.FileInfo, error) {
+					return nil, nil
+				}
+				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+					return nil
+				}
+				statFunc = func(name string) (os.FileInfo, error) {
+					return &fakeFileInfo{mode: 0}, nil
+				}
+			},
+			wantErr: true,
+			errMsg:  "invalid device: /notadevice",
+		},
+		{
+			name:   "Valid device",
+			source: "/dev/null",
+			setupMocks: func() {
+				lstatFunc = func(name string) (os.FileInfo, error) {
+					return nil, nil
+				}
+				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+					return nil
+				}
+				statFunc = func(name string) (os.FileInfo, error) {
+					return &fakeFileInfo{mode: os.ModeDevice}, nil
+				}
+			},
+			wantErr: false,
+		},
+		{
+			name:   "Invalid device",
+			source: "/notadevice",
+			setupMocks: func() {
+				lstatFunc = func(name string) (os.FileInfo, error) {
+					return nil, nil
+				}
+				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+					return nil
+				}
+				statFunc = func(name string) (os.FileInfo, error) {
+					return &fakeFileInfo{mode: 0}, errors.New("Invalid stats of device")
+				}
+			},
+			wantErr: true,
+			errMsg:  "Invalid stats of device",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			fs := &FS{}
+			_, err := fs.validateDevice(context.Background(), tt.source)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+type fakeFileInfo struct {
+	mode os.FileMode
+}
+
+func (f *fakeFileInfo) Name() string       { return "" }
+func (f *fakeFileInfo) Size() int64        { return 0 }
+func (f *fakeFileInfo) Mode() os.FileMode  { return f.mode }
+func (f *fakeFileInfo) ModTime() time.Time { return time.Time{} }
+func (f *fakeFileInfo) IsDir() bool        { return false }
+func (f *fakeFileInfo) Sys() interface{}   { return nil }
