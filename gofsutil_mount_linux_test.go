@@ -170,6 +170,39 @@ func TestGetDiskFormatInvalidPath(t *testing.T) {
 // 	}
 // }
 
+func Test_formatAndMount(t *testing.T) {
+	fs := &MockFS{}
+	ctx := context.WithValue(context.Background(), ContextKey("RequestID"), "test-req-id")
+	ctx = context.WithValue(ctx, ContextKey(NoDiscard), NoDiscard)
+
+	tests := []struct {
+		name      string
+		source    string
+		target    string
+		fsType    string
+		opts      []string
+		wantError bool
+	}{
+		{
+			name:      "Disk is formatted with a different filesystem and mount fails due to unknown error and unknown data, and the user provided format option",
+			source:    "/dev/sda1",
+			target:    "/mnt/data",
+			fsType:    "ext4",
+			opts:      []string{"defaults", "fsFormatOption:nodiscard"},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := fs.formatAndMount(ctx, tt.source, tt.target, tt.fsType, tt.opts...)
+			if (err != nil) != tt.wantError {
+				t.Errorf("formatAndMount() error = %v, wantError %v", err != nil, tt.wantError)
+			}
+		})
+	}
+}
+
 // MockFS struct for testing
 type MockFS struct {
 	FS
