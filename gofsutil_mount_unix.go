@@ -44,6 +44,7 @@ var PowerMaxOUIPrefix = "6000097"
 
 // PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
 var PowerStoreOUIPrefix = "68ccf09"
+
 var (
 	isBindFunc = func(fs *FS, ctx context.Context, opts ...string) ([]string, bool) {
 		return fs.isBind(ctx, opts...)

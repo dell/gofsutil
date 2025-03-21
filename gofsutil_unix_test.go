@@ -995,10 +995,10 @@ func TestMounts(t *testing.T) {
 			opts:    []string{"bind"},
 			wantErr: false,
 			setupMocks: func() {
-				isBindFunc = func(fs *FS, ctx context.Context, opts ...string) ([]string, bool) {
+				isBindFunc = func(_ *FS, _ context.Context, opts ...string) ([]string, bool) {
 					return opts, true
 				}
-				bindMountFunc = func(fs *FS, ctx context.Context, source, target string, opts ...string) error {
+				bindMountFunc = func(_ *FS, _ context.Context, _, _ string, _ ...string) error {
 					return nil
 				}
 			},
@@ -1011,13 +1011,13 @@ func TestMounts(t *testing.T) {
 			opts:    []string{},
 			wantErr: false,
 			setupMocks: func() {
-				isBindFunc = func(fs *FS, ctx context.Context, opts ...string) ([]string, bool) {
+				isBindFunc = func(_ *FS, _ context.Context, opts ...string) ([]string, bool) {
 					return opts, false
 				}
-				bindMountFunc = func(fs *FS, ctx context.Context, source, target string, opts ...string) error {
+				bindMountFunc = func(_ *FS, _ context.Context, _, _ string, _ ...string) error {
 					return nil
 				}
-				doMountFunc = func(fs *FS, ctx context.Context, command, source, target, fsType string, opts ...string) error {
+				doMountFunc = func(_ *FS, _ context.Context, _, _, _, _ string, _ ...string) error {
 					return nil
 				}
 			},
