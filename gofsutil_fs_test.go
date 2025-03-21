@@ -995,7 +995,6 @@ func TestFS_GetDiskFormat(t *testing.T) {
 }
 
 func TestFS_FormatAndMount(t *testing.T) {
-
 	type args struct {
 		ctx     context.Context
 		source  string
@@ -1030,7 +1029,6 @@ func TestFS_FormatAndMount(t *testing.T) {
 }
 
 func TestFS_Format(t *testing.T) {
-
 	type args struct {
 		ctx     context.Context
 		source  string
@@ -1082,7 +1080,6 @@ func TestFS_Mount(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-
 		{
 			name: "Error Mount Failed",
 			args: args{
@@ -1108,7 +1105,6 @@ func TestFS_Mount(t *testing.T) {
 }
 
 func TestFS_BindMount(t *testing.T) {
-
 	type args struct {
 		ctx     context.Context
 		source  string
@@ -1287,7 +1283,6 @@ func TestFS_ResizeFS(t *testing.T) {
 		wantErr bool
 	}{
 		{
-
 			name: "Error resizeFS",
 			args: args{
 				ctx:         context.Background(),
@@ -1328,7 +1323,6 @@ func TestFS_FindFSType(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-
 			name: "Success",
 			args: args{
 				ctx:        context.Background(),
@@ -1404,7 +1398,6 @@ func TestFS_DeviceRescan(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-
 		{
 			name: "Error Rescanning the device",
 			args: args{
@@ -1487,7 +1480,6 @@ func TestFS_fsInfo(t *testing.T) {
 				}
 				if got5 <= 0 {
 					t.Errorf("FS.fsInfo() got5 = %v,  want = > 0", got5)
-
 				}
 
 			}
@@ -1529,7 +1521,6 @@ func TestFS_FsInfo(t *testing.T) {
 				t.Errorf("FS.FsInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
 		})
 	}
 }
