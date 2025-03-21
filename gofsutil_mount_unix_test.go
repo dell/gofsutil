@@ -1019,7 +1019,7 @@ func TestValidateDevices(t *testing.T) {
 			name:   "Non-existent source",
 			source: "/nonexistent",
 			setupMocks: func() {
-				lstatFunc = func(name string) (os.FileInfo, error) {
+				lstatFunc = func(_ string) (os.FileInfo, error) {
 					return nil, os.ErrNotExist
 				}
 			},
@@ -1030,10 +1030,10 @@ func TestValidateDevices(t *testing.T) {
 			name:   "Invalid symlink",
 			source: "/invalidsymlink",
 			setupMocks: func() {
-				lstatFunc = func(name string) (os.FileInfo, error) {
+				lstatFunc = func(_ string) (os.FileInfo, error) {
 					return nil, nil
 				}
-				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+				evalSymlinksFunc = func(_ context.Context, _ *string) error {
 					return os.ErrNotExist
 				}
 			},
@@ -1044,13 +1044,13 @@ func TestValidateDevices(t *testing.T) {
 			name:   "Not a device",
 			source: "/notadevice",
 			setupMocks: func() {
-				lstatFunc = func(name string) (os.FileInfo, error) {
+				lstatFunc = func(_ string) (os.FileInfo, error) {
 					return nil, nil
 				}
-				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+				evalSymlinksFunc = func(_ context.Context, _ *string) error {
 					return nil
 				}
-				statFunc = func(name string) (os.FileInfo, error) {
+				statFunc = func(_ string) (os.FileInfo, error) {
 					return &fakeFileInfo{mode: 0}, nil
 				}
 			},
@@ -1061,13 +1061,13 @@ func TestValidateDevices(t *testing.T) {
 			name:   "Valid device",
 			source: "/dev/null",
 			setupMocks: func() {
-				lstatFunc = func(name string) (os.FileInfo, error) {
+				lstatFunc = func(_ string) (os.FileInfo, error) {
 					return nil, nil
 				}
-				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+				evalSymlinksFunc = func(_ context.Context, _ *string) error {
 					return nil
 				}
-				statFunc = func(name string) (os.FileInfo, error) {
+				statFunc = func(_ string) (os.FileInfo, error) {
 					return &fakeFileInfo{mode: os.ModeDevice}, nil
 				}
 			},
@@ -1077,13 +1077,13 @@ func TestValidateDevices(t *testing.T) {
 			name:   "Invalid device",
 			source: "/notadevice",
 			setupMocks: func() {
-				lstatFunc = func(name string) (os.FileInfo, error) {
+				lstatFunc = func(_ string) (os.FileInfo, error) {
 					return nil, nil
 				}
-				evalSymlinksFunc = func(ctx context.Context, path *string) error {
+				evalSymlinksFunc = func(_ context.Context, _ *string) error {
 					return nil
 				}
-				statFunc = func(name string) (os.FileInfo, error) {
+				statFunc = func(_ string) (os.FileInfo, error) {
 					return &fakeFileInfo{mode: 0}, errors.New("Invalid stats of device")
 				}
 			},
