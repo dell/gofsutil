@@ -74,7 +74,6 @@ func TestFormatAndMount(t *testing.T) {
 }
 
 func TestFormatAndMount_Error(t *testing.T) {
-
 	// Test case: FormatAndMount with invalid source
 	ctx := context.Background()
 	source := ""
@@ -88,7 +87,6 @@ func TestFormatAndMount_Error(t *testing.T) {
 }
 
 func TestFormat_Error(t *testing.T) {
-
 	// Test case: FormatAndMount with invalid source
 	ctx := context.Background()
 	source := ""
