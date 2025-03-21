@@ -298,6 +298,14 @@ func TestReadProcMounts(t *testing.T) {
 		wantErr   bool
 	}{
 		{
+			name: "Normal operation",
+			fs: &FS{},
+			path: "/",
+			wantInfos: nil,
+			wantHash: uint32(2166136261),
+			wantErr:  false,
+		},
+		{
 			name: "Error reading file",
 			fs: &FS{
 				ScanEntry: defaultEntryScanFunc,
@@ -314,7 +322,7 @@ func TestReadProcMounts(t *testing.T) {
 			ctx := context.Background()
 			infos, hash, err := tt.fs.readProcMounts(ctx, tt.path, tt.info)
 			if !reflect.DeepEqual(infos, tt.wantInfos) || hash != tt.wantHash || (err != nil) != tt.wantErr {
-				t.Errorf("readProcMounts() = (%v, %v, %v), want (%v, %v, %v)", infos, hash, err, tt.wantInfos, tt.wantHash, tt.wantErr)
+				t.Errorf("readProcMounts() = (%v, %v, %v), want (%v, %v, %v)", infos, hash, err != nil, tt.wantInfos, tt.wantHash, tt.wantErr)
 			}
 		})
 	}
