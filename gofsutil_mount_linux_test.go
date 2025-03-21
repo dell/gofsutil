@@ -291,24 +291,24 @@ func TestGetNativeDevicesFromPpath(t *testing.T) {
 	fs := &FS{}
 
 	tests := []struct {
-		name           string
-		ppath          string
+		name            string
+		ppath           string
 		expectedDevices []string
-		wantErr  bool
+		wantErr         bool
 	}{
 		{
-			name:           "Invalid ppath",
-			ppath:          "invalid_ppath",
+			name:            "Invalid ppath",
+			ppath:           "invalid_ppath",
 			expectedDevices: nil,
-			wantErr:  true,
+			wantErr:         true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			devices, err := fs.getNativeDevicesFromPpath(context.Background(), test.ppath)
-			if !reflect.DeepEqual(devices, test.expectedDevices) || (err!=nil) != test.wantErr {
-				t.Errorf("Expected: %v, %v. Actual: %v, %v", test.expectedDevices, test.wantErr, devices, err!=nil)
+			if !reflect.DeepEqual(devices, test.expectedDevices) || (err != nil) != test.wantErr {
+				t.Errorf("Expected: %v, %v. Actual: %v, %v", test.expectedDevices, test.wantErr, devices, err != nil)
 			}
 		})
 	}
@@ -316,13 +316,13 @@ func TestGetNativeDevicesFromPpath(t *testing.T) {
 
 func TestFS_expandXfs(t *testing.T) {
 	tests := []struct {
-		name     string
-		volume   string
-		wantErr  bool
+		name    string
+		volume  string
+		wantErr bool
 	}{
 		{
-			name:   "Invalid path",
-			volume: "/invalid/path",
+			name:    "Invalid path",
+			volume:  "/invalid/path",
 			wantErr: true,
 		},
 	}
@@ -350,12 +350,12 @@ func TestReadProcMounts(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name: "Normal operation",
-			fs: &FS{},
-			path: "/",
+			name:      "Normal operation",
+			fs:        &FS{},
+			path:      "/",
 			wantInfos: nil,
-			wantHash: uint32(2166136261),
-			wantErr:  false,
+			wantHash:  uint32(2166136261),
+			wantErr:   false,
 		},
 		{
 			name: "Error reading file",
