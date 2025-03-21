@@ -287,6 +287,32 @@ func TestIsLsblkNew(t *testing.T) {
 	}
 }
 
+
+func TestFS_expandXfs(t *testing.T) {
+	tests := []struct {
+		name     string
+		volume   string
+		wantErr  bool
+	}{
+		{
+			name:   "Invalid path",
+			volume: "/invalid/path",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{}
+
+			err := fs.expandXfs(tt.volume)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("expandXfs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestReadProcMounts(t *testing.T) {
 	tests := []struct {
 		name      string
