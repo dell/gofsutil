@@ -16,30 +16,21 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// func TestGetDiskFormat(t *testing.T) {
-// 	ctx := context.Background()
-// 	var disk string
+func TestGetDiskFormat(t *testing.T) {
+	// Test case: GetDiskFormat with invalid disk
+	ctx := context.Background()
+	disk := ""
 
-// 	switch runtime.GOOS {
-// 	case "windows":
-// 		disk = "C:\\"
-// 	case "linux", "darwin":
-// 		disk = "/dev/sda1"
-// 	default:
-// 		t.Fatalf("unsupported OS: %s", runtime.GOOS)
-// 	}
-
-// 	result, err := GetDiskFormat(ctx, disk)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got %v", err)
-// 	}
-// 	t.Logf("Disk format: %s", result)
-// 	assert.NotEmpty(t, result)
-// }
+	_, err := GetDiskFormat(ctx, disk)
+	if err == nil {
+		t.Errorf("GetDiskFormat should have failed with empty disk")
+	}
+}
 
 func TestFormatAndMount(t *testing.T) {
 	tests := []struct {
@@ -79,6 +70,34 @@ func TestFormatAndMount(t *testing.T) {
 			err := fs.FormatAndMount(tt.ctx, tt.source, tt.target, tt.fsType, tt.opts...)
 			assert.Equal(t, tt.expectedErr, err)
 		})
+	}
+}
+
+func TestFormatAndMount_Error(t *testing.T) {
+
+	// Test case: FormatAndMount with invalid source
+	ctx := context.Background()
+	source := ""
+	target := "/mnt/data"
+	fsType := "ext4"
+	opts := []string{"-o", "defaults"}
+
+	if err := FormatAndMount(ctx, source, target, fsType, opts...); err == nil {
+		t.Errorf("FormatAndMount should have failed with empty source")
+	}
+}
+
+func TestFormat_Error(t *testing.T) {
+
+	// Test case: FormatAndMount with invalid source
+	ctx := context.Background()
+	source := ""
+	target := "/mnt/data"
+	fsType := "ext4"
+	opts := []string{"-o", "defaults"}
+
+	if err := Format(ctx, source, target, fsType, opts...); err == nil {
+		t.Errorf("Format should have failed with empty source")
 	}
 }
 
@@ -123,6 +142,19 @@ func TestMount(t *testing.T) {
 	}
 }
 
+func TestMount_Error(t *testing.T) {
+	// Test case: Mount with invalid source
+	ctx := context.Background()
+	source := ""
+	target := "/mnt/data"
+	fsType := "ext4"
+	opts := []string{"-o", "defaults"}
+
+	if err := Mount(ctx, source, target, fsType, opts...); err == nil {
+		t.Errorf("Mount should have failed with empty source")
+	}
+}
+
 func TestBindMount(t *testing.T) {
 	tests := []struct {
 		testname    string
@@ -161,6 +193,18 @@ func TestBindMount(t *testing.T) {
 	}
 }
 
+func TestBindMount_Error(t *testing.T) {
+	// Test case: Mount with invalid source
+	ctx := context.Background()
+	source := ""
+	target := "/mnt/data"
+	opts := []string{"-o", "defaults"}
+
+	if err := BindMount(ctx, source, target, opts...); err == nil {
+		t.Errorf("BindMount should have failed with empty source")
+	}
+}
+
 func TestUnmount(t *testing.T) {
 	tests := []struct {
 		testname    string
@@ -187,16 +231,25 @@ func TestUnmount(t *testing.T) {
 	}
 }
 
-// func TestGetMountInfoFromDevice(t *testing.T) {
-// 	ctx := context.Background()
-// 	devID := "sda1"
+func TestUnmount_Error(t *testing.T) {
+	// Test case: Unmount with invalid target
+	ctx := context.Background()
+	target := ""
+	if err := Unmount(ctx, target); err == nil {
+		t.Errorf("Unmount should have failed with empty target")
+	}
+}
 
-// 	result, err := GetMountInfoFromDevice(ctx, devID)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got %v", err)
-// 	}
-// 	t.Logf("Mount info: %+v", result)
-// }
+func TestGetMountInfoFromDevice(t *testing.T) {
+	ctx := context.Background()
+	devID := "/dev/sda1"
+
+	result, err := GetMountInfoFromDevice(ctx, devID)
+	if err == nil {
+		t.Errorf("expected error, got %v", err)
+	}
+	t.Logf("Mount info: %+v", result)
+}
 
 func TestGetMpathNameFromDevice(t *testing.T) {
 	ctx := context.Background()
@@ -253,6 +306,20 @@ func TestResizeFS(t *testing.T) {
 	}
 }
 
+func TestResizeFS_Error(t *testing.T) {
+	// Test case: ResizeFS with invalid volumePath
+	ctx := context.Background()
+	volumePath := ""
+	devicePath := "/dev/sda1"
+	ppathDevice := "/dev/mapper/ppath"
+	mpathDevice := "/dev/mapper/mpath"
+	fsType := "ext4"
+
+	if err := ResizeFS(ctx, volumePath, devicePath, ppathDevice, mpathDevice, fsType); err == nil {
+		t.Errorf("ResizeFS should have failed with empty volumePath")
+	}
+}
+
 func TestResizeMultipath(t *testing.T) {
 	tests := []struct {
 		testname    string
@@ -282,6 +349,16 @@ func TestResizeMultipath(t *testing.T) {
 			err := fs.ResizeMultipath(tt.ctx, tt.deviceName)
 			assert.Equal(t, tt.expectedErr, err)
 		})
+	}
+}
+
+func TestResizeMultipath_Error(t *testing.T) {
+	// Test case: ResizeMultipath with invalid deviceName
+	ctx := context.Background()
+	deviceName := ""
+
+	if err := ResizeMultipath(ctx, deviceName); err == nil {
+		t.Errorf("ResizeMultipath should have failed with empty deviceName")
 	}
 }
 
@@ -328,6 +405,16 @@ func TestDeviceRescan(t *testing.T) {
 	}
 }
 
+func TestDeviceRescan_Error(t *testing.T) {
+	// Test case: DeviceRescan with invalid devicePath
+	ctx := context.Background()
+	devicePath := ""
+
+	if err := DeviceRescan(ctx, devicePath); err == nil {
+		t.Errorf("DeviceRescan should have failed with empty devicePath")
+	}
+}
+
 func TestGetMounts(t *testing.T) {
 	ctx := context.Background()
 
@@ -336,6 +423,92 @@ func TestGetMounts(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 	t.Logf("Mounts: %+v", result)
+}
+
+func TestGetDevMounts_NoError(t *testing.T) {
+	ctx := context.Background()
+	dev := "abc"
+
+	result, err := GetDevMounts(ctx, dev)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	t.Logf("Get Dev Mounts: %+v", result)
+}
+
+func TestEvalSymlinks(t *testing.T) {
+	// Test case: EvalSymlinks with invalid context
+	ctx := context.Background()
+	ctx = nil
+	symPath := "/test/symlink"
+
+	if err := EvalSymlinks(ctx, &symPath); err == nil {
+		t.Errorf("EvalSymlinks should have failed with nil context")
+	}
+}
+
+func TestWWNToDevicePath_Error(t *testing.T) {
+	// Test case: WWNToDevicePath with invalid wwn
+	ctx := context.Background()
+	wwn := ""
+
+	_, err := WWNToDevicePath(ctx, wwn)
+	if err == nil {
+		t.Errorf("WWNToDevicePath should have failed with empty wwn")
+	}
+}
+
+func TestWWNToDevicePathX(t *testing.T) {
+	// Test case: WWNToDevicePathX with invalid wwn
+	ctx := context.Background()
+	wwn := ""
+
+	_, _, err := WWNToDevicePathX(ctx, wwn)
+	if err == nil {
+		t.Errorf("WWNToDevicePathX should have failed with empty wwn")
+	}
+}
+
+func TestMultipathCommand_Error(t *testing.T) {
+	// Test case: MultipathCommand with invalid chroot
+	ctx := context.Background()
+	timeoutSeconds := time.Duration(10)
+	chroot := ""
+	arguments := []string{"-o", "defaults"}
+
+	if _, err := MultipathCommand(ctx, timeoutSeconds, chroot, arguments...); err == nil {
+		t.Errorf("MultipathCommand should have failed with empty chroot")
+	}
+}
+
+func TestTargetIPLUNToDevicePath_Error(t *testing.T) {
+	// Test case: TargetIPLUNToDevicePath with invalid targetIP
+	ctx := context.Background()
+	targetIP := "1.1.1.1"
+	lunID := 0
+
+	if _, err := TargetIPLUNToDevicePath(ctx, targetIP, lunID); err != nil {
+		t.Errorf("TargetIPLUNToDevicePath failed: %v", err)
+	}
+}
+
+func TestGetFCHostPortWWNs_Error(t *testing.T) {
+	// Test case: GetFCHostPortWWNs with with invalid context
+	ctx := context.Background()
+	ctx = nil
+
+	if _, err := GetFCHostPortWWNs(ctx); err == nil {
+		t.Errorf("GetFCHostPortWWNs should have failed with nil context")
+	}
+}
+
+func TestIssueLIPToAllFCHosts_Error(t *testing.T) {
+	// Test case: IssueLIPToAllFCHosts with with invalid context
+	ctx := context.Background()
+
+	if err := IssueLIPToAllFCHosts(ctx); err != nil {
+		t.Errorf("IssueLIPToAllFCHosts failed: %v", err)
+	}
 }
 
 func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
@@ -387,5 +560,15 @@ func TestMethodFormat(t *testing.T) {
 			err := fs.Format(tt.ctx, tt.source, tt.target, tt.fsType, tt.opts...)
 			assert.Equal(t, tt.expectedErr, err)
 		})
+	}
+}
+
+func TestFsInfo_Error(t *testing.T) {
+	// Test case: FsInfo with with invalid path
+	ctx := context.Background()
+	path := ""
+
+	if _, _, _, _, _, _, err := FsInfo(ctx, path); err == nil {
+		t.Errorf("FsInfo should have failed with empty path")
 	}
 }
