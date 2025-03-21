@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"reflect"
 	"testing"
 )
 
@@ -281,6 +282,39 @@ func TestIsLsblkNew(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("isLsblkNew() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadProcMounts(t *testing.T) {
+	tests := []struct {
+		name      string
+		fs        *FS
+		path      string
+		info      bool
+		wantInfos []Info
+		wantHash  uint32
+		wantErr   bool
+	}{
+		{
+			name: "Error reading file",
+			fs: &FS{
+				ScanEntry: defaultEntryScanFunc,
+			},
+			path:      "/wrong-path",
+			wantInfos: nil,
+			wantHash:  uint32(0),
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			infos, hash, err := tt.fs.readProcMounts(ctx, tt.path, tt.info)
+			if !reflect.DeepEqual(infos, tt.wantInfos) || hash != tt.wantHash || (err != nil) != tt.wantErr {
+				t.Errorf("readProcMounts() = (%v, %v, %v), want (%v, %v, %v)", infos, hash, err, tt.wantInfos, tt.wantHash, tt.wantErr)
 			}
 		})
 	}
