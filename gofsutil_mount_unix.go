@@ -45,16 +45,30 @@ var PowerMaxOUIPrefix = "6000097"
 // PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
 var PowerStoreOUIPrefix = "68ccf09"
 
+var (
+	isBindFunc = func(fs *FS, ctx context.Context, opts ...string) ([]string, bool) {
+		return fs.isBind(ctx, opts...)
+	}
+
+	bindMountFunc = func(fs *FS, ctx context.Context, source, target string, opts ...string) error {
+		return fs.bindMount(ctx, source, target, opts...)
+	}
+
+	doMountFunc = func(fs *FS, ctx context.Context, command, source, target, fsType string, opts ...string) error {
+		return fs.doMount(ctx, command, source, target, fsType, opts...)
+	}
+)
+
 func (fs *FS) mount(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string,
 ) error {
 	// All Linux distributes should support bind mounts.
-	if opts, ok := fs.isBind(ctx, opts...); ok {
-		return fs.bindMount(ctx, source, target, opts...)
+	if opts, ok := isBindFunc(fs, ctx, opts...); ok {
+		return bindMountFunc(fs, ctx, source, target, opts...)
 	}
-	return fs.doMount(ctx, "mount", source, target, fsType, opts...)
+	return doMountFunc(fs, ctx, "mount", source, target, fsType, opts...)
 }
 
 // validateMountArgs validates the arguments for mount operation.
@@ -178,19 +192,33 @@ func (fs *FS) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
 	return mountInfos, nil
 }
 
+var (
+	lstatFunc = func(name string) (os.FileInfo, error) {
+		return os.Lstat(name)
+	}
+
+	evalSymlinksFunc = func(ctx context.Context, path *string) error {
+		return EvalSymlinks(ctx, path)
+	}
+
+	statFunc = func(name string) (os.FileInfo, error) {
+		return os.Stat(name)
+	}
+)
+
 func (fs *FS) validateDevice(
 	ctx context.Context, source string,
 ) (string, error) {
-	if _, err := os.Lstat(source); err != nil {
+	if _, err := lstatFunc(source); err != nil {
 		return "", err
 	}
 
 	// Eval symlinks to ensure the specified path points to a real device.
-	if err := EvalSymlinks(ctx, &source); err != nil {
+	if err := evalSymlinksFunc(ctx, &source); err != nil {
 		return "", err
 	}
 
-	st, err := os.Stat(source)
+	st, err := statFunc(source)
 	if err != nil {
 		return "", err
 	}
@@ -517,7 +545,7 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 	devicePathComponents := strings.Split(blockDevicePath, "/")
 	if len(devicePathComponents) > 1 {
 		deviceName := devicePathComponents[len(devicePathComponents)-1]
-		statePath := fmt.Sprintf("/sys/block/%s/device/state", deviceName)
+		statePath := filepath.Join(SysBlockDir, fmt.Sprintf("%s/device/state", deviceName))
 		stateBytes, err := os.ReadFile(filepath.Clean(statePath))
 		if err != nil {
 			return fmt.Errorf("Cannot read %s: %s", statePath, err)
@@ -526,7 +554,7 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 		if deviceState == "blocked" {
 			return fmt.Errorf("Device %s is in blocked state", deviceName)
 		}
-		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
+		blockDeletePath := filepath.Join(SysBlockDir, fmt.Sprintf("%s/device/delete", deviceName))
 		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")

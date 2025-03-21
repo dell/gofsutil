@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -949,4 +950,617 @@ func TestMockMultipathCommand(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, "multipath command induced error", err.Error())
 	assert.Equal(t, []byte{}, output)
+}
+
+func TestFS_GetDiskFormat(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx  context.Context
+		disk string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "Error Getting the disk format",
+			args: args{
+				ctx:  context.Background(),
+				disk: "test_device",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			got, err := fs.GetDiskFormat(tt.args.ctx, tt.args.disk)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.GetDiskFormat() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("FS.GetDiskFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFS_FormatAndMount(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		source  string
+		target  string
+		fsType  string
+		options []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error determining disk format",
+			args: args{
+				ctx:     context.Background(),
+				source:  "test-source",
+				target:  "test-target",
+				options: []string{"defaults"},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{}
+			if err := fs.FormatAndMount(tt.args.ctx, tt.args.source, tt.args.target, tt.args.fsType, tt.args.options...); (err != nil) == tt.wantErr {
+				t.Errorf("FS.FormatAndMount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_Format(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		source  string
+		target  string
+		fsType  string
+		options []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error Executing MkfsCommand",
+			args: args{
+				ctx:     context.Background(),
+				source:  "test-source",
+				target:  "test-target",
+				fsType:  "ext4",
+				options: []string{"defaults"},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{}
+			if err := fs.Format(tt.args.ctx, tt.args.source, tt.args.target, tt.args.fsType, tt.args.options...); (err != nil) != tt.wantErr {
+				t.Errorf("FS.Format() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_Mount(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx     context.Context
+		source  string
+		target  string
+		fsType  string
+		options []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error Mount Failed",
+			args: args{
+				ctx:     context.Background(),
+				source:  "test-source",
+				target:  "test-target",
+				fsType:  "ext4",
+				options: []string{"defaults"},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			if err := fs.Mount(tt.args.ctx, tt.args.source, tt.args.target, tt.args.fsType, tt.args.options...); (err != nil) != tt.wantErr {
+				t.Errorf("FS.Mount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_BindMount(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		source  string
+		target  string
+		options []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error Bind Mount Failed with Options",
+			args: args{
+				ctx:     context.Background(),
+				source:  "test-source",
+				target:  "test-target",
+				options: []string{"defaults"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Error Bind Mount Failed Without Options",
+			args: args{
+				ctx:     context.Background(),
+				source:  "test-source",
+				target:  "test-target",
+				options: nil,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{}
+			if err := fs.BindMount(tt.args.ctx, tt.args.source, tt.args.target, tt.args.options...); (err != nil) != tt.wantErr {
+				t.Errorf("FS.BindMount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_Unmount(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx    context.Context
+		target string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error Unmount Failed",
+			args: args{
+				ctx:    context.Background(),
+				target: "test-target",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			if err := fs.Unmount(tt.args.ctx, tt.args.target); (err != nil) != tt.wantErr {
+				t.Errorf("FS.Unmount() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_GetMountInfoFromDevice(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx   context.Context
+		devID string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *DeviceMountInfo
+		wantErr bool
+	}{
+		{
+			name: "Error Get Mount Info Device not found",
+			args: args{
+				ctx:   context.Background(),
+				devID: "test_path",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			got, err := fs.GetMountInfoFromDevice(tt.args.ctx, tt.args.devID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.GetMountInfoFromDevice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("FS.GetMountInfoFromDevice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFS_GetMpathNameFromDevice(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx    context.Context
+		device string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{{
+		name: "GetMPath From Device",
+		args: args{
+			ctx:    context.Background(),
+			device: "test_path",
+		},
+		want:    "",
+		wantErr: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			got, err := fs.GetMpathNameFromDevice(tt.args.ctx, tt.args.device)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.GetMpathNameFromDevice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("FS.GetMpathNameFromDevice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFS_ResizeFS(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx         context.Context
+		volumePath  string
+		devicePath  string
+		ppathDevice string
+		mpathDevice string
+		fsType      string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error resizeFS",
+			args: args{
+				ctx:         context.Background(),
+				volumePath:  "volume_path",
+				devicePath:  "device_path",
+				ppathDevice: "",
+				mpathDevice: "",
+				fsType:      "ext4",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			if err := fs.ResizeFS(tt.args.ctx, tt.args.volumePath, tt.args.devicePath, tt.args.ppathDevice, tt.args.mpathDevice, tt.args.fsType); (err != nil) != tt.wantErr {
+				t.Errorf("FS.ResizeFS() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_FindFSType(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx        context.Context
+		mountpoint string
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		args       args
+		wantFsType string
+		wantErr    bool
+	}{
+		{
+			name: "Success",
+			args: args{
+				ctx:        context.Background(),
+				mountpoint: "mount_path",
+			},
+			wantFsType: "",
+			wantErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			gotFsType, err := fs.FindFSType(tt.args.ctx, tt.args.mountpoint)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.FindFSType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotFsType != tt.wantFsType {
+				t.Errorf("FS.FindFSType() = %v, want %v", gotFsType, tt.wantFsType)
+			}
+		})
+	}
+}
+
+func TestFS_ResizeMultipath(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx        context.Context
+		deviceName string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error Resizing the Multipatheth",
+			args: args{
+				ctx:        context.Background(),
+				deviceName: "test_device",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			if err := fs.ResizeMultipath(tt.args.ctx, tt.args.deviceName); (err != nil) != tt.wantErr {
+				t.Errorf("FS.ResizeMultipath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_DeviceRescan(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx        context.Context
+		devicePath string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Error Rescanning the device",
+			args: args{
+				ctx:        context.Background(),
+				devicePath: "test_device",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			if err := fs.DeviceRescan(tt.args.ctx, tt.args.devicePath); (err != nil) != tt.wantErr {
+				t.Errorf("FS.DeviceRescan() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFS_fsInfo(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		in0  context.Context
+		path string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+
+		wantErr bool
+	}{
+		{
+			name: "Error getting FS",
+			args: args{
+				in0:  context.Background(),
+				path: "test_device",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Success getting FS",
+			args: args{
+				in0:  context.Background(),
+				path: "/tmp",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			got, got1, got2, got3, got4, got5, err := fs.fsInfo(tt.args.in0, tt.args.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.fsInfo() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !(tt.wantErr) {
+
+				if got <= 0 {
+					t.Errorf("FS.fsInfo() got = %v, want = > 0", got)
+				}
+				if got1 <= 0 {
+					t.Errorf("FS.fsInfo() got1 = %v,  want = > 0", got1)
+				}
+				if got2 <= 0 {
+					t.Errorf("FS.fsInfo() got2 = %v,  want = > 0", got2)
+				}
+				if got3 <= 0 {
+					t.Errorf("FS.fsInfo() got3 = %v, want = > 0", got3)
+				}
+				if got4 <= 0 {
+					t.Errorf("FS.fsInfo() got4 = %v,  want = > 0", got4)
+				}
+				if got5 <= 0 {
+					t.Errorf("FS.fsInfo() got5 = %v,  want = > 0", got5)
+				}
+
+			}
+		})
+	}
+}
+
+func TestFS_FsInfo(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		ctx  context.Context
+		path string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+
+		wantErr bool
+	}{
+		{
+			name: "Error getting FS wrapper",
+			args: args{
+				ctx:  context.Background(),
+				path: "test_device",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			_, _, _, _, _, _, err := fs.FsInfo(tt.args.ctx, tt.args.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.FsInfo() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}
+
+func TestFS_GetNVMeController(t *testing.T) {
+	type fields struct {
+		ScanEntry EntryScanFunc
+	}
+	type args struct {
+		device string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "Error Getting the nvme controller",
+			args: args{
+				device: "/sys/class/nvme",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &FS{
+				ScanEntry: tt.fields.ScanEntry,
+			}
+			got, err := fs.GetNVMeController(tt.args.device)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FS.GetNVMeController() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("FS.GetNVMeController() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

@@ -1,7 +1,7 @@
 //go:build linux || darwin
 // +build linux darwin
 
-// Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ package gofsutil
 
 import (
 	"context"
-	// "fmt"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -459,7 +460,7 @@ func TestRescanSCSIHost(t *testing.T) {
 	}
 }
 
-func TestRemoveBlockDevice(t *testing.T) {
+func TestRemoveBlockDevice_Invalid(t *testing.T) {
 	tests := []struct {
 		testname        string
 		ctx             context.Context
@@ -480,7 +481,7 @@ func TestRemoveBlockDevice(t *testing.T) {
 	}
 }
 
-func TestIssueLIPToAllFCHosts(t *testing.T) {
+func TestIssueLIPToAllFCHosts_Valid(t *testing.T) {
 	tempDir := t.TempDir()
 	fcHostsDir = tempDir
 	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
@@ -726,6 +727,313 @@ func TestGetFCTargetHosts(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestRemoveBlockDevice(t *testing.T) {
+	tempDir := t.TempDir()
+	SysBlockDir = tempDir // Use the temporary directory for testing
+	require.NoError(t, os.MkdirAll(SysBlockDir, 0o755))
+
+	tests := []struct {
+		name            string
+		blockDevicePath string
+		stateContent    string
+		expectedError   string
+		setup           func()
+	}{
+		{
+			name:            "Device running",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "running",
+			expectedError:   "",
+			setup:           func() {},
+		},
+		{
+			name:            "Device blocked",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "blocked",
+			expectedError:   "Device sda is in blocked state",
+			setup:           func() {},
+		},
+		{
+			name:            "Cannot read state file",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "",
+			expectedError:   fmt.Sprintf("Cannot read %s/sda/device/state: open %s/sda/device/state: no such file or directory", tempDir, tempDir),
+			setup:           func() {},
+		},
+		{
+			name:            "Error opening delete file",
+			blockDevicePath: "/sys/block/sda",
+			stateContent:    "running",
+			expectedError:   fmt.Sprintf("open %s/sda/device/delete: no such file or directory", tempDir),
+			setup: func() {
+				// Remove the delete file to simulate error
+				deletePath := filepath.Join(SysBlockDir, "sda/device/delete")
+				require.NoError(t, os.RemoveAll(deletePath))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			statePath := filepath.Join(SysBlockDir, "sda/device/state")
+			require.NoError(t, os.MkdirAll(filepath.Dir(statePath), 0o755))
+			if tt.stateContent != "" {
+				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o600))
+			} else {
+				// Ensure the state file does not exist for the "Cannot read state file" test case
+				require.NoError(t, os.RemoveAll(statePath))
+			}
+
+			// Create the delete file
+			deletePath := filepath.Join(SysBlockDir, "sda/device/delete")
+			require.NoError(t, os.MkdirAll(filepath.Dir(deletePath), 0o755))
+			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o600))
+
+			// Run the setup function to simulate specific error conditions
+			tt.setup()
+
+			fs := &FS{}
+			err := fs.removeBlockDevice(context.Background(), tt.blockDevicePath)
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestIssueLIPToAllFCHosts(t *testing.T) {
+	tempDir := t.TempDir()
+	fcHostsDir = tempDir
+	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
+
+	fs := &FS{}
+
+	tests := []struct {
+		name       string
+		hosts      map[string]string
+		shouldFail bool
+		setup      func()
+	}{
+		{
+			name: "Single host",
+			hosts: map[string]string{
+				"host1": "1",
+			},
+			shouldFail: false,
+			setup:      func() {},
+		},
+		{
+			name: "Multiple hosts",
+			hosts: map[string]string{
+				"host1": "1",
+				"host2": "1",
+			},
+			shouldFail: false,
+			setup:      func() {},
+		},
+		{
+			name:       "No hosts",
+			hosts:      map[string]string{},
+			shouldFail: false,
+			setup:      func() {},
+		},
+		{
+			name:       "Error reading directory",
+			hosts:      map[string]string{},
+			shouldFail: false,
+			setup: func() {
+				// Remove the directory to simulate error
+				require.NoError(t, os.RemoveAll(fcHostsDir))
+			},
+		},
+		{
+			name: "Error opening issue_lip file",
+			hosts: map[string]string{
+				"host1": "1",
+			},
+			shouldFail: false,
+			setup: func() {
+				// Make the issue_lip file read-only to simulate error
+				lipFile := filepath.Join(fcHostsDir, "host1/issue_lip")
+				require.NoError(t, os.Chmod(lipFile, 0o400))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock hosts and issue_lip files
+			for host, lip := range tt.hosts {
+				hostDir := filepath.Join(fcHostsDir, host)
+				require.NoError(t, os.MkdirAll(hostDir, 0o755))
+				lipFile := filepath.Join(hostDir, "issue_lip")
+				require.NoError(t, os.WriteFile(lipFile, []byte(lip), 0o200))
+			}
+
+			// Run the setup function to simulate specific error conditions
+			tt.setup()
+
+			// Call the function
+			err := fs.issueLIPToAllFCHosts(context.Background())
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestMultipathCommands(t *testing.T) {
+	tests := []struct {
+		testname       string
+		timeoutSeconds time.Duration
+		chroot         string
+		arguments      []string
+		expectErr      error
+		setup          func()
+	}{
+		{
+			testname:       "Empty chroot",
+			timeoutSeconds: time.Duration(10),
+			chroot:         "",
+			arguments:      []string{"A", "iR"},
+			expectErr: &os.PathError{
+				Op:   "fork/exec",
+				Path: "/usr/sbin/multipath",
+				Err:  syscall.ENOENT,
+			},
+			setup: func() {},
+		},
+		{
+			testname:       "Invalid arguments",
+			timeoutSeconds: time.Duration(10),
+			chroot:         "",
+			arguments:      []string{"invalid"},
+			expectErr: &os.PathError{
+				Op:   "fork/exec",
+				Path: "/usr/sbin/multipath",
+				Err:  syscall.ENOENT,
+			},
+			setup: func() {},
+		},
+		{
+			testname:       "Valid chroot",
+			timeoutSeconds: time.Duration(10),
+			chroot:         "/valid/chroot",
+			arguments:      []string{"A", "iR"},
+			expectErr: &exec.ExitError{
+				ProcessState: &os.ProcessState{},
+			},
+			setup: func() {
+				require.NoError(t, os.MkdirAll("/valid/chroot", 0o755))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			fs := FS{}
+			tt.setup()
+
+			// Call the function
+			_, err := fs.multipathCommand(context.Background(), tt.timeoutSeconds, tt.chroot, tt.arguments...)
+			if tt.expectErr != nil {
+				require.Error(t, err)
+				if pathErr, ok := tt.expectErr.(*os.PathError); ok {
+					assert.IsType(t, pathErr, err)
+					assert.Equal(t, pathErr.Op, err.(*os.PathError).Op)
+					assert.Equal(t, pathErr.Path, err.(*os.PathError).Path)
+					assert.Equal(t, pathErr.Err, err.(*os.PathError).Err)
+				} else if exitErr, ok := tt.expectErr.(*exec.ExitError); ok {
+					assert.IsType(t, exitErr, err)
+				} else {
+					assert.Equal(t, tt.expectErr, err)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestMounts(t *testing.T) {
+	originalIsBindFunc := isBindFunc
+	originalBindMountFunc := bindMountFunc
+	originalDoMountFunc := doMountFunc
+
+	defer func() {
+		isBindFunc = originalIsBindFunc
+		bindMountFunc = originalBindMountFunc
+		doMountFunc = originalDoMountFunc
+	}()
+
+	type testCase struct {
+		name       string
+		source     string
+		target     string
+		fsType     string
+		opts       []string
+		wantErr    bool
+		setupMocks func()
+	}
+
+	testCases := []testCase{
+		{
+			name:    "Bind mount",
+			source:  "/source",
+			target:  "/target",
+			fsType:  "",
+			opts:    []string{"bind"},
+			wantErr: false,
+			setupMocks: func() {
+				isBindFunc = func(_ *FS, _ context.Context, opts ...string) ([]string, bool) {
+					return opts, true
+				}
+				bindMountFunc = func(_ *FS, _ context.Context, _, _ string, _ ...string) error {
+					return nil
+				}
+			},
+		},
+		{
+			name:    "Regular mount",
+			source:  "/source",
+			target:  "/target",
+			fsType:  "ext4",
+			opts:    []string{},
+			wantErr: false,
+			setupMocks: func() {
+				isBindFunc = func(_ *FS, _ context.Context, opts ...string) ([]string, bool) {
+					return opts, false
+				}
+				bindMountFunc = func(_ *FS, _ context.Context, _, _ string, _ ...string) error {
+					return nil
+				}
+				doMountFunc = func(_ *FS, _ context.Context, _, _, _, _ string, _ ...string) error {
+					return nil
+				}
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMocks != nil {
+				tt.setupMocks()
+			}
+
+			fs := &FS{}
+			err := fs.mount(context.Background(), tt.source, tt.target, tt.fsType, tt.opts...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("mount() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
