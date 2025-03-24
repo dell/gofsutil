@@ -430,3 +430,19 @@ func TestReadProcMounts(t *testing.T) {
 		})
 	}
 }
+
+func TestGetMpathNameFromDevice_Error(t *testing.T) {
+	// Create a new instance of FS
+	fs := &FS{}
+
+	// Test case when device is a invalid path
+	device := "/"
+	expectedMpathName := ""
+	mpathName, err := fs.getMpathNameFromDevice(context.Background(), device)
+	if err == nil {
+		t.Errorf("Expected error, got: %v", err)
+	}
+	if mpathName != expectedMpathName {
+		t.Errorf("Expected mpathName to be %s, but got %s", expectedMpathName, mpathName)
+	}
+}
