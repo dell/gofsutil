@@ -435,13 +435,33 @@ func TestGetDevMounts_NoError(t *testing.T) {
 }
 
 func TestEvalSymlinks(t *testing.T) {
-	// Test case: EvalSymlinks with invalid context
-	ctx := context.Background()
-	ctx = nil
-	symPath := "/test/symlink"
+	tests := []struct {
+		name      string
+		ctx       context.Context
+		symPath   string
+		shouldErr bool
+	}{
+		{
+			name:      "Context with symlink path",
+			ctx:       context.Background(),
+			symPath:   "/test/symlink",
+			shouldErr: true,
+		},
+		{
+			name:      "With /tmp path",
+			ctx:       context.Background(),
+			symPath:   "/tmp",
+			shouldErr: false,
+		},
+	}
 
-	if err := EvalSymlinks(ctx, &symPath); err == nil {
-		t.Errorf("EvalSymlinks should have failed with nil context")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := EvalSymlinks(tt.ctx, &tt.symPath)
+			if (err != nil) != tt.shouldErr {
+				t.Errorf("TestEvalSymlinks failed for %s: expected error: %v, got: %v", tt.name, tt.shouldErr, err)
+			}
+		})
 	}
 }
 
@@ -570,18 +590,3 @@ func TestFsInfo_Error(t *testing.T) {
 		t.Errorf("FsInfo should have failed with empty path")
 	}
 }
-
-// func TestUseMockFS(t *testing.T) {
-// 	tests := []struct {
-// 		name string
-// 	}{
-// 		{
-// 			name: "UseMockFS",
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(_ *testing.T) {
-// 			UseMockFS()
-// 		})
-// 	}
-// }
