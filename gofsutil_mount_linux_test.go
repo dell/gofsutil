@@ -260,6 +260,19 @@ func Test_formatAndMount(t *testing.T) {
 			opts:      []string{},
 			wantError: true,
 		},
+		{
+			name: "Disk failed to mount",
+			setup: func() {
+				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+					return []byte("ext4\n"), nil
+				}
+			},
+			source:    "/dev/sda1",
+			target:    "/mnt/data",
+			fsType:    "ext4",
+			opts:      []string{},
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {
