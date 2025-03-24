@@ -84,7 +84,7 @@ func TestGetDiskFormatUnformattedDisk(t *testing.T) {
 		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
 	}()
 
-	getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+	getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 		return []byte("\n"), nil
 	}
 
@@ -108,7 +108,7 @@ func TestGetDiskFormatUnknownData(t *testing.T) {
 		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
 	}()
 
-	getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+	getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 		return []byte("\ntest1\ntest2"), nil
 	}
 
@@ -211,7 +211,7 @@ func Test_formatAndMount(t *testing.T) {
 		{
 			name: "Disk is Unformatted and mount pass",
 			setup: func() {
-				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+				getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 					return []byte("\n"), nil
 				}
 			},
@@ -224,7 +224,7 @@ func Test_formatAndMount(t *testing.T) {
 		{
 			name: "Disk is Unformatted and user provides format option",
 			setup: func() {
-				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+				getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 					return []byte("\n"), nil
 				}
 			},
@@ -237,7 +237,7 @@ func Test_formatAndMount(t *testing.T) {
 		{
 			name: "Disk is Unformatted and user provides format option as xfs",
 			setup: func() {
-				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+				getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 					return []byte("\n"), nil
 				}
 			},
@@ -250,7 +250,7 @@ func Test_formatAndMount(t *testing.T) {
 		{
 			name: "fsType xfs - Disk is Unformatted and mount pass",
 			setup: func() {
-				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+				getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 					return []byte("\n"), nil
 				}
 			},
@@ -263,7 +263,7 @@ func Test_formatAndMount(t *testing.T) {
 		{
 			name: "Disk failed to mount",
 			setup: func() {
-				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+				getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 					return []byte("ext4\n"), nil
 				}
 			},
@@ -449,7 +449,7 @@ func TestGetNativeDevicesFromPpath(t *testing.T) {
 		{
 			name: "Success",
 			setup: func() {
-				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+				getExecCommandCombinedOutput = func(_ string, _ ...string) ([]byte, error) {
 					return []byte("/dev/emcpowerg   :EMC     :SYMMETRIX       :60000970000120000549533030354435\n"), nil
 				}
 			},

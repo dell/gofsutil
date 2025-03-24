@@ -38,7 +38,7 @@ var (
 	bindRemountOpts              = []string{"remount"}
 	getExecCommandCombinedOutput = func(name string, arg ...string) ([]byte, error) {
 		/* #nosec G204 */
-		return exec.Command("lsblk", arg...).CombinedOutput()
+		return exec.Command(name, arg...).CombinedOutput()
 	}
 )
 
