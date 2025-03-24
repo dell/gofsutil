@@ -248,6 +248,24 @@ func TestFormat(t *testing.T) {
 			mockError: errors.New("format failed"),
 			wantError: true,
 		},
+		{
+			name:      "format failure",
+			source:    "test-source",
+			target:    "test-target",
+			fsType:    "",
+			opts:      []string{"defaults"},
+			mockError: errors.New("format failed"),
+			wantError: true,
+		},
+		{
+			name:      "format xfs failure",
+			source:    "test-source",
+			target:    "test-target",
+			fsType:    "xfs",
+			opts:      []string{"defaults"},
+			mockError: errors.New("format failed"),
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {
