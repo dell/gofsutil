@@ -479,26 +479,26 @@ func TestMultipathCommand_Error(t *testing.T) {
 	}
 }
 
-// func TestTargetIPLUNToDevicePath_Error(t *testing.T) {
-// 	// Test case: TargetIPLUNToDevicePath with invalid targetIP
-// 	ctx := context.Background()
-// 	targetIP := "1.1.1.1"
-// 	lunID := 0
+func TestTargetIPLUNToDevicePath_Error(t *testing.T) {
+	// Test case: TargetIPLUNToDevicePath with invalid targetIP
+	ctx := context.Background()
+	targetIP := "1.1.1.1"
+	lunID := 0
 
-// 	if _, err := TargetIPLUNToDevicePath(ctx, targetIP, lunID); err != nil {
-// 		t.Errorf("TargetIPLUNToDevicePath failed: %v", err)
-// 	}
-// }
+	if _, err := TargetIPLUNToDevicePath(ctx, targetIP, lunID); err == nil {
+		t.Errorf("TargetIPLUNToDevicePath error expectd")
+	}
+}
 
-// func TestGetFCHostPortWWNs_Error(t *testing.T) {
-// 	// Test case: GetFCHostPortWWNs with with invalid context
-// 	ctx := context.Background()
-// 	ctx = nil
+func TestGetFCHostPortWWNs_Error(t *testing.T) {
+	// Test case: GetFCHostPortWWNs with with invalid context
+	ctx := context.Background()
+	ctx = nil
 
-// 	if _, err := GetFCHostPortWWNs(ctx); err == nil {
-// 		t.Errorf("GetFCHostPortWWNs should have failed with nil context")
-// 	}
-// }
+	if _, err := GetFCHostPortWWNs(ctx); err != nil {
+		t.Errorf("GetFCHostPortWWNs failed with err: %v", err)
+	}
+}
 
 func TestIssueLIPToAllFCHosts_Error(t *testing.T) {
 	// Test case: IssueLIPToAllFCHosts with with invalid context
