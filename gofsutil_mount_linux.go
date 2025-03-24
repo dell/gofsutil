@@ -34,7 +34,13 @@ const (
 	ppinqtool         = "pp_inq"
 )
 
-var bindRemountOpts = []string{"remount"}
+var (
+	bindRemountOpts              = []string{"remount"}
+	getExecCommandCombinedOutput = func(name string, arg ...string) ([]byte, error) {
+		/* #nosec G204 */
+		return exec.Command("lsblk", arg...).CombinedOutput()
+	}
+)
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
 func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
@@ -50,8 +56,7 @@ func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
 	}
 	log.WithFields(f).WithField("args", args).Info(
 		"checking if disk is formatted using lsblk")
-	/* #nosec G204 */
-	buf, err := exec.Command("lsblk", args...).CombinedOutput()
+	buf, err := getExecCommandCombinedOutput("lsblk", args...)
 	out := string(buf)
 	log.WithField("output", out).Debug("lsblk output")
 
