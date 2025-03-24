@@ -23,40 +23,6 @@ import (
 // Mocking exec.Command
 var execCommand = exec.Command
 
-// func TestGetDiskFormatValidPath(t *testing.T) {
-// 	// Create a test FS
-// 	fs := &FS{}
-
-// 	// Create a test disk path
-// 	disk := "/dev/sda1"
-
-// 	// Mock the lsblk output
-// 	output := "ext4\n"
-// 	origCmd := execCommand
-// 	execCommand = func(name string, args ...string) *exec.Cmd {
-// 		if name == "lsblk" {
-// 			cmd := &exec.Cmd{
-// 				Path:   name,
-// 				Args:   append([]string{name}, args...),
-// 				Stdout: &bytes.Buffer{},
-// 				Stderr: &bytes.Buffer{},
-// 			}
-// 			cmd.Stdout.(*bytes.Buffer).WriteString(output)
-// 			return cmd
-// 		}
-// 		return origCmd(name, args...)
-// 	}
-// 	defer func() {
-// 		execCommand = origCmd
-// 	}()
-
-// 	// Call getDiskFormat
-// 	_, err := fs.getDiskFormat(context.Background(), disk)
-// 	if err != nil {
-// 		t.Errorf("expected no error, got %v", err)
-// 	}
-// }
-
 func TestGetDiskFormatInvalidPath(t *testing.T) {
 	// Create a test FS
 	fs := &FS{}
@@ -118,65 +84,6 @@ func TestGetDiskFormatUnknownData(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 }
-
-// func TestFormatAndMountSuccess(t *testing.T) {
-// 	fs := &FS{}
-// 	ctx := context.Background()
-// 	source := "test-source"
-// 	target := "test-target"
-// 	fsType := "ext4"
-// 	opts := []string{"defaults"}
-
-// 	err := fs.formatAndMount(ctx, source, target, fsType, opts...)
-// 	if err != nil {
-// 		t.Errorf("expected nil, got %v", err)
-// 	}
-// }
-
-// func TestFormatAndMountNoFsFormatOption(t *testing.T) {
-// 	fs := &FS{}
-// 	ctx := context.Background()
-// 	source := "test-source"
-// 	target := "test-target"
-// 	fsType := "ext4"
-// 	opts := []string{"defaults"}
-
-// 	err := fs.formatAndMount(ctx, source, target, fsType, opts...)
-// 	if err != nil {
-// 		t.Errorf("expected nil, got %v", err)
-// 	}
-// }
-
-// func TestFormatAndMountWithFsFormatOption(t *testing.T) {
-// 	fs := &FS{}
-// 	ctx := context.Background()
-// 	source := "test-source"
-// 	target := "test-target"
-// 	fsType := "ext4"
-// 	opts := []string{"defaults", "fsFormatOption:-F"}
-
-// 	err := fs.formatAndMount(ctx, source, target, fsType, opts...)
-// 	if err != nil {
-// 		t.Errorf("expected nil, got %v", err)
-// 	}
-// }
-
-// func TestFormatAndMountNoDiscard(t *testing.T) {
-// 	fs := &FS{}
-// 	ctx := context.Background()
-// 	source := "test-source"
-// 	target := "test-target"
-// 	fsType := "ext4"
-// 	opts := []string{"defaults"}
-
-// 	// Simulate NoDiscard option
-// 	ctx = context.WithValue(ctx, ContextKey(NoDiscard), NoDiscard)
-
-// 	err := fs.formatAndMount(ctx, source, target, fsType, opts...)
-// 	if err != nil {
-// 		t.Errorf("expected nil, got %v", err)
-// 	}
-// }
 
 func Test_formatAndMount(t *testing.T) {
 	fs := &MockFS{}
@@ -292,14 +199,6 @@ type MockFS struct {
 	FS
 }
 
-// func (fs *MockFS) validateMountArgs(source, target, fsType string, opts ...string) error {
-// 	// Mock validation logic
-// 	if source == "" || target == "" || fsType == "" {
-// 		return errors.New("invalid arguments")
-// 	}
-// 	return nil
-// }
-
 func TestFormat(t *testing.T) {
 	fs := &MockFS{}
 	ctx := context.WithValue(context.Background(), ContextKey("RequestID"), "test-req-id")
@@ -314,15 +213,6 @@ func TestFormat(t *testing.T) {
 		mockError error
 		wantError bool
 	}{
-		// {
-		// 	name:      "successful format",
-		// 	source:    "test-source",
-		// 	target:    "test-target",
-		// 	fsType:    "ext4",
-		// 	opts:      []string{"defaults"},
-		// 	mockError: nil,
-		// 	wantError: false,
-		// },
 		{
 			name:      "format failure",
 			source:    "test-source",
@@ -384,18 +274,6 @@ func TestIsLsblkNew(t *testing.T) {
 			want:      true,
 			wantError: false,
 		},
-		// {
-		// 	name:      "lsblk version less than 2.30",
-		// 	output:    "lsblk from util-linux 2.29.2",
-		// 	want:      false,
-		// 	wantError: false,
-		// },
-		// {
-		// 	name:      "lsblk command error",
-		// 	output:    "",
-		// 	want:      false,
-		// 	wantError: true,
-		// },
 	}
 
 	for _, tt := range tests {
