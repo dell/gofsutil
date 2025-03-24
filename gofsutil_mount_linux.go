@@ -360,7 +360,7 @@ func (fs *FS) getNativeDevicesFromPpath(
 	cmd := fmt.Sprintf("%s/%s", "/noderoot/sbin", ppinqtool)
 	log.Debug("pp_inq cmd:", cmd)
 	args := []string{"-wwn", "-dev", deviceName}
-	out, err := exec.Command(cmd, args...).CombinedOutput() // #nosec G204
+	out, err := getExecCommandCombinedOutput(cmd, args...)
 	if err != nil {
 		log.Errorf("Error powermt display %s: %v", deviceName, err)
 		return devices, err

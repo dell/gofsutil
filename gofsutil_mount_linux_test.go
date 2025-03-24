@@ -425,22 +425,44 @@ func TestIsLsblkNew(t *testing.T) {
 func TestGetNativeDevicesFromPpath(t *testing.T) {
 	fs := &FS{}
 
+	// Mock the output
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+
+	after := func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}
+
 	tests := []struct {
 		name            string
+		setup           func()
 		ppath           string
 		expectedDevices []string
 		wantErr         bool
 	}{
 		{
 			name:            "Invalid ppath",
+			setup:           func() {},
 			ppath:           "invalid_ppath",
 			expectedDevices: nil,
 			wantErr:         true,
+		},
+		{
+			name: "Success",
+			setup: func() {
+				getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+					return []byte("/dev/emcpowerg   :EMC     :SYMMETRIX       :60000970000120000549533030354435\n"), nil
+				}
+			},
+			ppath:           "invalid_ppath",
+			expectedDevices: []string{},
+			wantErr:         false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test.setup()
+			defer after()
 			devices, err := fs.getNativeDevicesFromPpath(context.Background(), test.ppath)
 			if !reflect.DeepEqual(devices, test.expectedDevices) || (err != nil) != test.wantErr {
 				t.Errorf("Expected: %v, %v. Actual: %v, %v", test.expectedDevices, test.wantErr, devices, err != nil)
