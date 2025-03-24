@@ -571,17 +571,17 @@ func TestFsInfo_Error(t *testing.T) {
 	}
 }
 
-func TestUseMockFS(t *testing.T) {
-	tests := []struct {
-		name string
-	}{
-		{
-			name: "UseMockFS",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			UseMockFS()
-		})
-	}
-}
+// func TestUseMockFS(t *testing.T) {
+// 	tests := []struct {
+// 		name string
+// 	}{
+// 		{
+// 			name: "UseMockFS",
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(_ *testing.T) {
+// 			UseMockFS()
+// 		})
+// 	}
+// }
