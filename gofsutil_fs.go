@@ -1,4 +1,4 @@
-// Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,8 +23,6 @@ import (
 type FS struct {
 	// ScanEntry is the function used to process mount table entries.
 	ScanEntry EntryScanFunc
-	// SysBlockDir is used to set the directory of block devices.
-	SysBlockDir string
 }
 
 // GetDiskFormat uses 'lsblk' to see if the given disk is unformatted.

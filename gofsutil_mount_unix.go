@@ -1,7 +1,7 @@
 //go:build linux || darwin
 // +build linux darwin
 
-// Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,16 +45,42 @@ var PowerMaxOUIPrefix = "6000097"
 // PowerStoreOUIPrefix - PowerStore format 6 OUI prefix
 var PowerStoreOUIPrefix = "68ccf09"
 
+var (
+	isBindFunc = func(fs *FS, ctx context.Context, opts ...string) ([]string, bool) {
+		return fs.isBind(ctx, opts...)
+	}
+
+	bindMountFunc = func(fs *FS, ctx context.Context, source, target string, opts ...string) error {
+		return fs.bindMount(ctx, source, target, opts...)
+	}
+
+	doMountFunc = func(fs *FS, ctx context.Context, command, source, target, fsType string, opts ...string) error {
+		return fs.doMount(ctx, command, source, target, fsType, opts...)
+	}
+
+	lstatFunc = func(name string) (os.FileInfo, error) {
+		return os.Lstat(name)
+	}
+
+	evalSymlinksFunc = func(ctx context.Context, path *string) error {
+		return EvalSymlinks(ctx, path)
+	}
+
+	statFunc = func(name string) (os.FileInfo, error) {
+		return os.Stat(name)
+	}
+)
+
 func (fs *FS) mount(
 	ctx context.Context,
 	source, target, fsType string,
 	opts ...string,
 ) error {
 	// All Linux distributes should support bind mounts.
-	if opts, ok := fs.isBind(ctx, opts...); ok {
-		return fs.bindMount(ctx, source, target, opts...)
+	if opts, ok := isBindFunc(fs, ctx, opts...); ok {
+		return bindMountFunc(fs, ctx, source, target, opts...)
 	}
-	return fs.doMount(ctx, "mount", source, target, fsType, opts...)
+	return doMountFunc(fs, ctx, "mount", source, target, fsType, opts...)
 }
 
 // validateMountArgs validates the arguments for mount operation.
@@ -181,16 +207,16 @@ func (fs *FS) getDevMounts(ctx context.Context, dev string) ([]Info, error) {
 func (fs *FS) validateDevice(
 	ctx context.Context, source string,
 ) (string, error) {
-	if _, err := os.Lstat(source); err != nil {
+	if _, err := lstatFunc(source); err != nil {
 		return "", err
 	}
 
 	// Eval symlinks to ensure the specified path points to a real device.
-	if err := EvalSymlinks(ctx, &source); err != nil {
+	if err := evalSymlinksFunc(ctx, &source); err != nil {
 		return "", err
 	}
 
-	st, err := os.Stat(source)
+	st, err := statFunc(source)
 	if err != nil {
 		return "", err
 	}
@@ -214,11 +240,12 @@ func (fs *FS) wwnToDevicePath(
 
 	// Look for nvme path device.
 	if err != nil || devPath == "" {
-		symlinkPath = fmt.Sprintf("/dev/disk/by-id/nvme-eui.%s", wwn)
+		symlinkPath = filepath.Join(multipathDevDiskByID, fmt.Sprintf("nvme-eui.%s", wwn))
 		devPath, err = os.Readlink(symlinkPath)
 		if err != nil || devPath == "" {
 			// Look for normal path device
-			symlinkPath = fmt.Sprintf("/dev/disk/by-id/wwn-0x%s", wwn)
+			symlinkPath = filepath.Join(multipathDevDiskByID, fmt.Sprintf("wwn-0x%s", wwn))
+
 			devPath, err = os.Readlink(symlinkPath)
 			if err != nil {
 				log.Printf("Check for disk path %s not found", symlinkPath)
@@ -236,10 +263,10 @@ func (fs *FS) wwnToDevicePath(
 // targetIPLUNToDevicePath returns all the /dev/disk/by-path entries for a give targetIP and lunID
 func (fs *FS) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID int) (map[string]string, error) {
 	result := make(map[string]string, 0)
-	bypathdir := "/dev/disk/by-path"
+
 	entries, err := os.ReadDir(bypathdir)
 	if err != nil {
-		log.Printf("/dev/disk/by-path not found: %s", err.Error())
+		log.Printf("%s not found: %s", bypathdir, err.Error())
 		return result, err
 	}
 	// Loop through the entries
@@ -383,7 +410,6 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 		return targetDev, nil
 	}
 	// Read the directory entries for fc_remote_ports
-	fcRemotePortsDir := "/sys/class/fc_remote_ports"
 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcRemotePortsDir)
@@ -438,7 +464,6 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 		return targetDev, nil
 	}
 	// Read the sessions.
-	sessionsdir := "/sys/class/iscsi_session"
 	sessions, err := os.ReadDir(sessionsdir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
@@ -518,7 +543,7 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 	devicePathComponents := strings.Split(blockDevicePath, "/")
 	if len(devicePathComponents) > 1 {
 		deviceName := devicePathComponents[len(devicePathComponents)-1]
-		statePath := fmt.Sprintf("/sys/block/%s/device/state", deviceName)
+		statePath := filepath.Join(sysBlockDir, fmt.Sprintf("%s/device/state", deviceName))
 		stateBytes, err := os.ReadFile(filepath.Clean(statePath))
 		if err != nil {
 			return fmt.Errorf("Cannot read %s: %s", statePath, err)
@@ -527,7 +552,7 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 		if deviceState == "blocked" {
 			return fmt.Errorf("Device %s is in blocked state", deviceName)
 		}
-		blockDeletePath := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
+		blockDeletePath := filepath.Join(sysBlockDir, fmt.Sprintf("%s/device/delete", deviceName))
 		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")
@@ -587,7 +612,6 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 	portWWNs := make([]string, 0)
 	// Read the directory entries for fc_remote_ports
-	fcHostsDir := "/sys/class/fc_host"
 	hostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
@@ -614,7 +638,6 @@ func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 	var savedError error
 	// Read the directory entries for fc_remote_ports
-	fcHostsDir := "/sys/class/fc_host"
 	fcHostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
 		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
@@ -650,9 +673,9 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string) ([]string, error) {
 	start := time.Now()
 	result := make([]string, 0)
-	sysBlocks, err := os.ReadDir(fs.SysBlockDir)
+	sysBlocks, err := os.ReadDir(sysBlockDir)
 	if err != nil {
-		return result, fmt.Errorf("Error reading %s: %s", fs.SysBlockDir, err)
+		return result, fmt.Errorf("Error reading %s: %s", sysBlockDir, err)
 	}
 
 	for _, sysBlock := range sysBlocks {
@@ -665,9 +688,9 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string
 		// Set the WWID path based on the device type
 		var wwidPath string
 		if strings.HasPrefix(name, "nvme") {
-			wwidPath = fs.SysBlockDir + "/" + name + "/wwid" // For NVMe devices
+			wwidPath = sysBlockDir + "/" + name + "/wwid" // For NVMe devices
 		} else {
-			wwidPath = fs.SysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
+			wwidPath = sysBlockDir + "/" + name + "/device/wwid" // For SCSI devices
 		}
 
 		bytes, err := os.ReadFile(filepath.Clean(wwidPath))
@@ -746,7 +769,7 @@ func wwnMatches(nguid, wwn string) bool {
 
 // GetNVMeController retrieves the NVMe controller for a given NVMe device.
 func (fs *FS) getNVMeController(device string) (string, error) {
-	devicePath := filepath.Join(fs.SysBlockDir, device)
+	devicePath := filepath.Join(sysBlockDir, device)
 
 	// Check if the device path exists
 	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
