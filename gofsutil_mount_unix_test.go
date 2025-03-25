@@ -678,13 +678,13 @@ func TestGetFCTargetHosts(t *testing.T) {
 
 func TestRemoveBlockDevice(t *testing.T) {
 	tempDir := t.TempDir()
-	SysBlockDir = tempDir // Use the temporary directory for testing
-	require.NoError(t, os.MkdirAll(SysBlockDir, 0o755))
+	sysBlockDir = tempDir // Use the temporary directory for testing
+	require.NoError(t, os.MkdirAll(sysBlockDir, 0o755))
 
 	// Ensure the directory is cleaned up after the test
 	defer func() {
-		require.NoError(t, os.RemoveAll(SysBlockDir))
-		SysBlockDir = "/sys/block"
+		require.NoError(t, os.RemoveAll(sysBlockDir))
+		sysBlockDir = "/sys/block"
 	}()
 
 	tests := []struct {
@@ -722,7 +722,7 @@ func TestRemoveBlockDevice(t *testing.T) {
 			expectedError:   fmt.Sprintf("open %s/sda/device/delete: no such file or directory", tempDir),
 			setup: func() {
 				// Remove the delete file to simulate error
-				deletePath := filepath.Join(SysBlockDir, "sda/device/delete")
+				deletePath := filepath.Join(sysBlockDir, "sda/device/delete")
 				require.NoError(t, os.RemoveAll(deletePath))
 			},
 		},
@@ -730,7 +730,7 @@ func TestRemoveBlockDevice(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			statePath := filepath.Join(SysBlockDir, "sda/device/state")
+			statePath := filepath.Join(sysBlockDir, "sda/device/state")
 			require.NoError(t, os.MkdirAll(filepath.Dir(statePath), 0o755))
 			if tt.stateContent != "" {
 				require.NoError(t, os.WriteFile(statePath, []byte(tt.stateContent), 0o600))
@@ -740,7 +740,7 @@ func TestRemoveBlockDevice(t *testing.T) {
 			}
 
 			// Create the delete file
-			deletePath := filepath.Join(SysBlockDir, "sda/device/delete")
+			deletePath := filepath.Join(sysBlockDir, "sda/device/delete")
 			require.NoError(t, os.MkdirAll(filepath.Dir(deletePath), 0o755))
 			require.NoError(t, os.WriteFile(deletePath, []byte{}, 0o600))
 

@@ -93,6 +93,7 @@ var (
 	fcHostsDir           = "/sys/class/fc_host"
 	sessionsdir          = "/sys/class/iscsi_session"
 	fcRemotePortsDir     = "/sys/class/fc_remote_ports"
+	sysBlockDir          = "/sys/block"
 )
 
 // ContextKey is a variable containing context-keys

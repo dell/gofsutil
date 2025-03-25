@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package gofsutil_test
+package gofsutil
 
 import (
 	"context"
@@ -20,63 +20,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// func TestBindMount(t *testing.T) {
-// 	src, err := os.MkdirTemp("", "")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	tgt, err := os.MkdirTemp("", "")
-// 	if err != nil {
-// 		os.RemoveAll(src)
-// 		t.Fatal(err)
-// 	}
-// 	if err := gofsutil.EvalSymlinks(context.TODO(), &src); err != nil {
-// 		os.RemoveAll(tgt)
-// 		os.RemoveAll(src)
-// 		t.Fatal(err)
-// 	}
-// 	if err := gofsutil.EvalSymlinks(context.TODO(), &tgt); err != nil {
-// 		os.RemoveAll(tgt)
-// 		os.RemoveAll(src)
-// 		t.Fatal(err)
-// 	}
-// 	defer func() {
-// 		gofsutil.Unmount(context.TODO(), tgt)
-// 		os.RemoveAll(tgt)
-// 		os.RemoveAll(src)
-// 	}()
-// 	if err := gofsutil.BindMount(context.TODO(), src, tgt); err != nil {
-// 		t.Error(err)
-// 		t.Fail()
-// 		return
-// 	}
-// 	t.Logf("bind mount success: source=%s, target=%s", src, tgt)
-// 	mounts, err := gofsutil.GetMounts(context.TODO())
-// 	if err != nil {
-// 		t.Error(err)
-// 		t.Fail()
-// 		return
-// 	}
-// 	success := false
-// 	for _, m := range mounts {
-// 		if m.Source == src && m.Path == tgt {
-// 			success = true
-// 		}
-// 		t.Logf("%+v", m)
-// 	}
-// 	if !success {
-// 		t.Errorf("unable to find bind mount: src=%s, tgt=%s", src, tgt)
-// 		t.Fail()
-// 	}
-// }
-
-func TestGetMounts(t *testing.T) {
-	mounts, err := gofsutil.GetMounts(context.TODO())
+func TestGetMount(t *testing.T) {
+	mounts, err := GetMounts(context.TODO())
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -87,9 +36,15 @@ func TestGetMounts(t *testing.T) {
 	}
 }
 
-func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
+func TestGetSysBlockDevicesForVolumeWWNs(t *testing.T) {
 	tempDir := t.TempDir()
-	gofsutil.SysBlockDir = tempDir
+	sysBlockDir = tempDir
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(sysBlockDir))
+		sysBlockDir = "/sys/block"
+	}()
 
 	tests := []struct {
 		name           string
@@ -144,7 +99,7 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 			require.Nil(t, err)
 
 			// Call the function with the test input
-			result, err := gofsutil.GetSysBlockDevicesForVolumeWWN(context.Background(), tt.wwn)
+			result, err := GetSysBlockDevicesForVolumeWWN(context.Background(), tt.wwn)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expect, result)
 		})
@@ -153,7 +108,13 @@ func TestGetSysBlockDevicesForVolumeWWN(t *testing.T) {
 
 func TestGetNVMeController(t *testing.T) {
 	tempDir := t.TempDir()
-	gofsutil.SysBlockDir = tempDir
+	sysBlockDir = tempDir
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(sysBlockDir))
+		sysBlockDir = "/sys/block"
+	}()
 
 	tests := map[string]struct {
 		device      string
@@ -201,7 +162,7 @@ func TestGetNVMeController(t *testing.T) {
 			}
 
 			// Call the function with the test input
-			controller, err := gofsutil.GetNVMeController(test.device)
+			controller, err := GetNVMeController(test.device)
 			if test.expectedErr != nil && err == nil {
 				t.Errorf("getNVMeController() did not return error, expected %v", test.expectedErr)
 			} else if test.expectedErr == nil && err != nil {
