@@ -1,4 +1,4 @@
-// Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,13 @@ const (
 	ppinqtool         = "pp_inq"
 )
 
-var bindRemountOpts = []string{"remount"}
+var (
+	bindRemountOpts              = []string{"remount"}
+	getExecCommandCombinedOutput = func(name string, arg ...string) ([]byte, error) {
+		/* #nosec G204 */
+		return exec.Command(name, arg...).CombinedOutput()
+	}
+)
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
 func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
@@ -50,8 +56,7 @@ func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
 	}
 	log.WithFields(f).WithField("args", args).Info(
 		"checking if disk is formatted using lsblk")
-	/* #nosec G204 */
-	buf, err := exec.Command("lsblk", args...).CombinedOutput()
+	buf, err := getExecCommandCombinedOutput("lsblk", args...)
 	out := string(buf)
 	log.WithField("output", out).Debug("lsblk output")
 
@@ -355,7 +360,7 @@ func (fs *FS) getNativeDevicesFromPpath(
 	cmd := fmt.Sprintf("%s/%s", "/noderoot/sbin", ppinqtool)
 	log.Debug("pp_inq cmd:", cmd)
 	args := []string{"-wwn", "-dev", deviceName}
-	out, err := exec.Command(cmd, args...).CombinedOutput() // #nosec G204
+	out, err := getExecCommandCombinedOutput(cmd, args...)
 	if err != nil {
 		log.Errorf("Error powermt display %s: %v", deviceName, err)
 		return devices, err
