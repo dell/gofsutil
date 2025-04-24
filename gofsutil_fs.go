@@ -193,15 +193,15 @@ func (fs *FS) fsInfo(_ context.Context, path string) (int64, int64, int64, int64
 
 	// Available is blocks available * fragment size
 	// #nosec G115
-	available := int64(statfs.Bavail) * statfs.Bsize
+	available := int64(statfs.Bavail) * int64(statfs.Bsize)
 
 	// Capacity is total block count * fragment size
 	// #nosec G115
-	capacity := int64(statfs.Blocks) * statfs.Bsize
+	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
 
 	// Usage is block being used * fragment size (aka block size).
 	// #nosec G115
-	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * statfs.Bsize
+	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
 	// #nosec G115
 	inodes := int64(statfs.Files)
