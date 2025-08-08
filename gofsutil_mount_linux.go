@@ -395,7 +395,6 @@ func (fs *FS) getNativeDevicesFromPpath(
 func (fs *FS) getMountInfoFromDevice(
 	ctx context.Context, devID string,
 ) (*DeviceMountInfo, error) {
-
 	if devID == "" {
 		return nil, fmt.Errorf("device ID cannot be empty")
 	}
