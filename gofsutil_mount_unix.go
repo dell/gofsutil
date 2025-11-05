@@ -1,5 +1,4 @@
 //go:build linux || darwin
-// +build linux darwin
 
 // Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
