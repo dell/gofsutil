@@ -81,6 +81,15 @@ func TestGetSysBlockDevicesForVolumeWWNs(t *testing.T) {
 			expect:         []string{"nvme0n2"},
 			errString:      "",
 		},
+		{
+			name:           "Powerflex nvme block device",
+			wwn:            "77d3b2750000002064b94e6077518e0f",
+			nguid:          "77d3b2750000002064b94e6077518e0f",
+			deviceName:     "nvme0n3",
+			deviceWwidPath: []string{"wwid"},
+			expect:         []string{"nvme0n3"},
+			errString:      "",
+		},
 	}
 
 	for _, tt := range tests {

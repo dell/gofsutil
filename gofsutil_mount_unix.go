@@ -742,9 +742,7 @@ func wwnMatches(nguid, wwn string) bool {
 	}
 
 	wwn = strings.ToLower(wwn)
-	if strings.HasPrefix(wwn, "naa.") {
-		wwn = wwn[4:]
-	}
+	wwn = strings.TrimPrefix(wwn, "naa.")
 
 	var token1, token2 string
 	if strings.HasPrefix(wwn, PowerStoreOUIPrefix) {
@@ -761,6 +759,8 @@ func wwnMatches(nguid, wwn string) bool {
 		if strings.HasPrefix(nguid, token1+token2) {
 			return true
 		}
+	} else {
+		return strings.EqualFold(nguid, wwn)
 	}
 
 	return false

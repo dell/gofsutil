@@ -519,7 +519,7 @@ func (fs *FS) findFSType(
 		return "", fmt.Errorf("Failed to find mount information for (%s) error (%v)", mountpoint, err)
 	}
 	fsType = strings.TrimSuffix(string(buf), "\n")
-	return
+	return fsType, err
 }
 
 func (fs *FS) resizeMultipath(_ context.Context, deviceName string) error {

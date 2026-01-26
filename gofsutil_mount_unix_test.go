@@ -423,14 +423,10 @@ func TestRescanSCSIHost(t *testing.T) {
 			expectErr: nil,
 		},
 		{
-			testname: "Targets",
-			targets:  []string{"iqn.2016-06.io.k8s", "iqn.2017-06.io.k8s", "0x500000"},
-			lun:      "",
-			expectErr: &os.PathError{
-				Op:   "open",                     // Operation that caused the error
-				Path: "/sys/class/iscsi_session", // Path where the error occurred
-				Err:  syscall.ENOENT,             // Error code (e.g., 0x2 corresponds to ENOENT - "No such file or directory")
-			},
+			testname:  "Targets",
+			targets:   []string{"iqn.2016-06.io.k8s", "iqn.2017-06.io.k8s", "0x500000"},
+			lun:       "",
+			expectErr: nil,
 		},
 	}
 	for _, tt := range tests {
@@ -889,7 +885,8 @@ func TestMultipathCommand(t *testing.T) {
 				ProcessState: &os.ProcessState{},
 			},
 			setup: func() {
-				require.NoError(t, os.MkdirAll("/valid/chroot", 0o755))
+				chroot := filepath.Join(t.TempDir(), "chroot")
+				require.NoError(t, os.MkdirAll(chroot, 0o755))
 			},
 		},
 	}

@@ -15,10 +15,12 @@ package gofsutil
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetDiskFormat(t *testing.T) {
@@ -514,6 +516,16 @@ func TestGetFCHostPortWWNs_Error(t *testing.T) {
 	// Test case: GetFCHostPortWWNs with with invalid context
 	ctx := context.Background()
 	ctx = nil
+
+	tempDir := t.TempDir()
+	fcHostsDir = tempDir
+	require.NoError(t, os.MkdirAll(fcHostsDir, 0o755))
+
+	// Ensure the directory is cleaned up after the test
+	defer func() {
+		require.NoError(t, os.RemoveAll(fcHostsDir))
+		fcHostsDir = "/sys/class/fc_host"
+	}()
 
 	if _, err := GetFCHostPortWWNs(ctx); err != nil {
 		t.Errorf("GetFCHostPortWWNs failed with err: %v", err)
