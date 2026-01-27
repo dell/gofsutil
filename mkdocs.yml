@@ -1,0 +1,7 @@
+site_name: 'gofsutil'
+site_description: 'gofsutil Documentation.'
+docs_dir: docs
+plugins:
+  - techdocs-core
+theme:
+  name: material

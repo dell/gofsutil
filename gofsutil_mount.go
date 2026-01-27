@@ -131,7 +131,7 @@ func defaultEntryScanFunc(
 		`(?i)^devtmpfs|(?:fuse\..*)|(?:nfs\d?)$`, entry.FSType)
 	sourceHasSlashPrefix := strings.HasPrefix(entry.MountSource, "/")
 	if valid = validFSType || sourceHasSlashPrefix; !valid {
-		return
+		return info, valid, failed
 	}
 
 	// Copy the Entry object's fields to the Info object.
@@ -156,7 +156,7 @@ func defaultEntryScanFunc(
 		cache[entry.MountSource] = entry
 	}
 
-	return
+	return info, valid, failed
 }
 
 /*

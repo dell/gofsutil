@@ -424,6 +424,7 @@ func (fs *mockfs) rescanSCSIHost(_ context.Context, _ []string, lun string) erro
 		scanString := fmt.Sprintf("%s", lun)
 		GOFSRescanCallback(scanString)
 	}
+
 	return nil
 }
 
