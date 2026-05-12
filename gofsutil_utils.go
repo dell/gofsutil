@@ -64,3 +64,23 @@ func validateMultipathArgs(options ...string) error {
 
 	return nil
 }
+
+// validateDeviceID validates device identifiers to prevent OS command injection.
+// Device IDs should only contain alphanumeric characters, underscores, hyphens, and dots.
+// This follows the same pattern used in goiscsi for CVE-2022-34374 (DSA-2022-202).
+func validateDeviceID(devID string) error {
+	if devID == "" {
+		return errors.New("device ID cannot be empty")
+	}
+	// Allow only alphanumeric characters, underscores, hyphens, and dots
+	// This covers valid device names like: sda, sda1, nvme0n1, mpath0, emcpowera,
+	// dm-0, 3600601xxxxxxx, vol-abc123, etc.
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9_\-\.]+$`, devID)
+	if err != nil {
+		return errors.New("failed to validate device ID: " + err.Error())
+	}
+	if !matched {
+		return errors.New("device ID contains invalid characters: " + devID)
+	}
+	return nil
+}

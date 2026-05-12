@@ -1322,13 +1322,13 @@ func TestFS_FindFSType(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name: "Success",
+			name: "Error_Mount_Path_Not_Found",
 			args: args{
 				ctx:        context.Background(),
 				mountpoint: "mount_path",
 			},
 			wantFsType: "",
-			wantErr:    false,
+			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {

@@ -43,17 +43,57 @@ var (
 )
 
 // getDiskFormat uses 'lsblk' to see if the given disk is unformatted
+// For SDC devices (/dev/scini*), it uses 'blkid' instead as lsblk doesn't work with character devices
 func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
 	path := filepath.Clean(disk)
 	if err := validatePath(path); err != nil {
 		return "", err
 	}
 
-	args := []string{"-n", "-o", "FSTYPE", disk}
-
 	f := log.Fields{
 		"disk": disk,
 	}
+
+	// Check if this is an SDC device (character device /dev/scini*)
+	// SDC devices are character devices, not block devices, so lsblk doesn't work
+	if strings.HasPrefix(disk, "/dev/scini") {
+		log.WithFields(f).Info("checking if SDC disk is formatted using blkid")
+		buf, err := getExecCommandCombinedOutput("blkid", "-o", "value", "-s", "TYPE", disk)
+		out := strings.TrimSpace(string(buf))
+		log.WithField("output", out).Debug("blkid output")
+
+		if err != nil {
+			// blkid returns exit code 2 when no filesystem is found (unformatted)
+			// This is expected for unformatted devices
+			var exitCode int
+			if exitError, ok := err.(*exec.ExitError); ok {
+				exitCode = exitError.ExitCode()
+			}
+
+			if exitCode == 2 || out == "" {
+				// Exit code 2 or empty output means unformatted device
+				log.WithFields(f).WithField("exitCode", exitCode).Debug("blkid indicates unformatted SDC device")
+				return "", nil
+			}
+
+			// Other errors are actual failures
+			log.WithFields(f).WithField("exitCode", exitCode).WithError(err).Error("blkid failed for SDC device")
+			return "", err
+		}
+
+		if out != "" {
+			// The device is formatted
+			log.WithFields(f).WithField("fstype", out).Info("SDC device has filesystem")
+			return out, nil
+		}
+
+		// Empty output means unformatted
+		return "", nil
+	}
+
+	// For non-SDC devices, use lsblk as before
+	args := []string{"-n", "-o", "FSTYPE", disk}
+
 	log.WithFields(f).WithField("args", args).Info(
 		"checking if disk is formatted using lsblk")
 	buf, err := getExecCommandCombinedOutput("lsblk", args...)
@@ -76,7 +116,25 @@ func (fs *FS) getDiskFormat(_ context.Context, disk string) (string, error) {
 	}
 
 	if len(lines) == 1 {
-		// The device is unformatted and has no dependent devices
+		// lsblk returned empty for a single device. This could mean the device
+		// is truly unformatted, OR lsblk could not read the FS type (e.g.
+		// device-mapper symlinks inside containers where sysfs is incomplete).
+		// Fall back to blkid which reads the superblock directly.
+		blkidArgs := []string{"-o", "value", "-s", "TYPE", disk}
+		log.WithFields(f).WithField("args", blkidArgs).Info(
+			"lsblk returned empty; probing with blkid as fallback")
+		blkBuf, blkErr := getExecCommandCombinedOutput("blkid", blkidArgs...)
+		blkOut := strings.TrimSpace(string(blkBuf))
+		log.WithField("output", blkOut).Debug("blkid fallback output")
+
+		if blkErr == nil && blkOut != "" {
+			// blkid found a filesystem that lsblk missed
+			log.WithFields(f).WithField("fstype", blkOut).Info(
+				"blkid fallback detected filesystem")
+			return blkOut, nil
+		}
+
+		// blkid also returned empty or errored — device is truly unformatted
 		return "", nil
 	}
 
@@ -295,8 +353,8 @@ func (fs *FS) bindMount(
 // isLsblkNew returns true if lsblk version is greater than 2.3 and false otherwise
 func (fs *FS) isLsblkNew() (bool, error) {
 	lsblkNew := false
-	checkVersCmd := "lsblk -V"
-	bufcheck, errcheck := exec.Command("bash", "-c", checkVersCmd).Output()
+	// Use exec.Command with argv-style arguments instead of bash -c to avoid shell injection
+	bufcheck, errcheck := exec.Command("lsblk", "-V").Output()
 	if errcheck != nil {
 		return lsblkNew, errcheck
 	}
@@ -326,24 +384,49 @@ func (fs *FS) getMpathNameFromDevice(
 		return "", err
 	}
 
-	var cmd string
+	// Validate device to prevent OS command injection (CWE-78)
+	if err := validateDeviceID(device); err != nil {
+		return "", fmt.Errorf("invalid device for getMpathNameFromDevice: %w", err)
+	}
+
+	var args []string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
 		return "", err
 	}
 	if lsblkNew {
-		cmd = "lsblk -Px MODE | awk '/" + device + "/{c=2}c&&c--' | grep TYPE=\\\"mpath\\\""
+		args = []string{"-Px", "MODE"}
 	} else {
-		cmd = "lsblk -P | awk '/" + device + "/{c=2}c&&c--' | grep TYPE=\\\"mpath\\\""
+		args = []string{"-P"}
 	}
-	fmt.Println(cmd)
 
-	buf, _ := exec.Command("bash", "-c", cmd).Output() // #nosec G204
+	// Use exec.Command with argv-style arguments instead of bash -c
+	buf, err := exec.Command("lsblk", args...).Output()
+	if err != nil {
+		return "", nil // lsblk may fail if device doesn't exist, return empty
+	}
 	output := string(buf)
-	mpathDeviceRegx := regexp.MustCompile(`NAME="\S+"`)
-	mpath := mpathDeviceRegx.FindString(output)
-	if mpath != "" {
-		return strings.Split(mpath, "\"")[1], nil
+
+	// Filter output in Go instead of using awk/grep in shell
+	mpathDeviceRegx := regexp.MustCompile(`NAME="(\S+)"`)
+	lines := strings.Split(output, "\n")
+	foundDevice := false
+	linesToCheck := 0
+
+	for _, line := range lines {
+		if strings.Contains(line, device) {
+			foundDevice = true
+			linesToCheck = 2
+		}
+		if foundDevice && linesToCheck > 0 {
+			if strings.Contains(line, `TYPE="mpath"`) {
+				match := mpathDeviceRegx.FindStringSubmatch(line)
+				if len(match) > 1 {
+					return match[1], nil
+				}
+			}
+			linesToCheck--
+		}
 	}
 
 	return "", nil
@@ -403,56 +486,101 @@ func (fs *FS) getMountInfoFromDevice(
 		return nil, err
 	}
 
-	var cmd string
+	// Validate devID to prevent OS command injection (CWE-78)
+	// This is critical as devID is used in pattern matching against lsblk output
+	if err := validateDeviceID(devID); err != nil {
+		return nil, fmt.Errorf("invalid device ID for getMountInfoFromDevice: %w", err)
+	}
+
 	var output string
 	lsblkNew, err := fs.isLsblkNew()
 	if err != nil {
 		return nil, err
 	}
-	//check if devID has powerpath devices
-	/* #nosec G204 */
-	checkCmd := "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/emcpower.+" + devID + "/ {print $0}'"
-	log.Debugf("ppath checkcommand values is %s", checkCmd)
-	/* #nosec G204 */
-	buf, err := exec.Command("bash", "-c", checkCmd).Output()
+	// check if devID has powerpath devices
+	// Use exec.Command with argv-style arguments instead of bash -c to avoid shell injection
+	// Get lsblk output and filter in Go instead of using awk
+	buf, err := exec.Command("lsblk", "--pairs", "--output", "NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT").Output()
 	if err != nil {
 		return nil, err
 	}
-	output = string(buf)
+	lsblkOutput := string(buf)
+	lines := strings.Split(lsblkOutput, "\n")
+
+	// Filter for powerpath devices in Go instead of awk - use regexp.QuoteMeta for safe pattern matching
+	ppathRegex := regexp.MustCompile(`emcpower.+` + regexp.QuoteMeta(devID))
+	var ppathMatches []string
+	for _, line := range lines {
+		if ppathRegex.MatchString(line) {
+			ppathMatches = append(ppathMatches, line)
+		}
+	}
+	output = strings.Join(ppathMatches, "\n")
 	if output == "" {
 		// output is nil, powerpath device not found, continuing for multipath or single device
 		log.Info("powerpath command output is nil, continuing for multipath or single device")
-		/* #nosec G204 */
-		checkCmd = "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/mpath.+" + devID + "/ {print $0}'"
-		log.Debugf("mpath checkcommand values is %s", checkCmd)
 
-		/* #nosec G204 */
-		buf, err = exec.Command("bash", "-c", checkCmd).Output()
-		if err != nil {
-			return nil, err
+		// Filter for multipath devices in Go instead of awk
+		mpathRegex := regexp.MustCompile(`mpath.+` + regexp.QuoteMeta(devID))
+		var mpathMatches []string
+		for _, line := range lines {
+			if mpathRegex.MatchString(line) {
+				mpathMatches = append(mpathMatches, line)
+			}
 		}
-		output = string(buf)
+		output = strings.Join(mpathMatches, "\n")
 		log.Debugf("multipath exec command output is : %+v", output)
+		var lsblkArgs []string
 		if output != "" {
+			log.Info("Multipath device found")
 			if lsblkNew {
-				cmd = "lsblk --pairs --sort MODE --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+				lsblkArgs = []string{"--pairs", "--sort", "MODE", "--output", "NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT"}
 			} else {
-				cmd = "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/{if (a && a !~ /" + devID + "/) print a; print} {a=$0}'"
+				lsblkArgs = []string{"--pairs", "--output", "NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT"}
 			}
 		} else {
+			log.Info("Multipath device not found")
 			// multipath device not found, continue as single device
-			/* #nosec G204 */
-			cmd = "lsblk --pairs --output NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT | awk '/" + devID + "/ {print $0}'"
+			lsblkArgs = []string{"--pairs", "--output", "NAME,MAJ:MIN,RM,SIZE,RO,TYPE,MOUNTPOINT"}
 		}
-		log.Debugf("command value is %s", cmd)
-		/* #nosec G204 */
-		buf, err = exec.Command("bash", "-c", cmd).Output()
+
+		// Execute lsblk with argv-style arguments instead of bash -c
+		buf, err = exec.Command("lsblk", lsblkArgs...).Output()
 		if err != nil {
 			return nil, err
 		}
-		output = string(buf)
+		lsblkOutput = string(buf)
+		lines = strings.Split(lsblkOutput, "\n")
+
+		// Filter output in Go instead of awk - use regexp.QuoteMeta for safe pattern matching
+		devRegex := regexp.MustCompile(regexp.QuoteMeta(devID))
+		if output != "" {
+			// Multipath device found - replicate awk: '/{devID}/{if (a && a !~ /{devID}/) print a; print} {a=$0}'
+			var matchedLines []string
+			var prevLine string
+			for _, line := range lines {
+				if devRegex.MatchString(line) {
+					if prevLine != "" && !devRegex.MatchString(prevLine) {
+						matchedLines = append(matchedLines, prevLine)
+					}
+					matchedLines = append(matchedLines, line)
+				}
+				prevLine = line
+			}
+			output = strings.Join(matchedLines, "\n")
+		} else {
+			// Single device - replicate awk: '/{devID}/ {print $0}'
+			var matchedLines []string
+			for _, line := range lines {
+				if devRegex.MatchString(line) {
+					matchedLines = append(matchedLines, line)
+				}
+			}
+			output = strings.Join(matchedLines, "\n")
+		}
 		log.Debugf("command output is : %+v", output)
 	}
+
 	if output == "" {
 		return nil, fmt.Errorf("Device not found")
 	}
@@ -512,13 +640,12 @@ func (fs *FS) findFSType(
 		return "", fmt.Errorf("Failed to validate path: %s error %v", mountpoint, err)
 	}
 
-	cmd := "findmnt -n \"" + path + "\" | awk '{print $3}'"
-	/* #nosec G204 */
-	buf, err := exec.Command("bash", "-c", cmd).Output()
+	// Use exec.Command with argv-style arguments instead of bash -c to avoid shell injection
+	buf, err := exec.Command("findmnt", "-n", "-o", "FSTYPE", path).Output()
 	if err != nil {
 		return "", fmt.Errorf("Failed to find mount information for (%s) error (%v)", mountpoint, err)
 	}
-	fsType = strings.TrimSuffix(string(buf), "\n")
+	fsType = strings.TrimSpace(string(buf))
 	return fsType, err
 }
 
@@ -630,11 +757,10 @@ func (fs *FS) deviceRescan(_ context.Context,
 		return err
 	}
 	device := path + "/device/rescan"
-	args := []string{"-c", "echo 1 > " + device}
 	log.Infof("Executing rescan command on device (%s)", devicePath)
-	/* #nosec G204 */
-	buf, err := exec.Command("bash", args...).CombinedOutput()
-	out := string(buf)
+	// Write directly to sysfs instead of executing bash -c "echo 1 > ...".
+	out := "1\n"
+	err := os.WriteFile(device, []byte(out), 0o644)
 	log.WithField("output", out).Debug("Rescan output")
 	if err != nil {
 		log.Errorf("Failed to rescan device with error (%s)", err.Error())
