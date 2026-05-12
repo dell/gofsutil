@@ -367,10 +367,11 @@ func TestFindFSType(t *testing.T) {
 	mountpoint := "/mnt/test"
 
 	result, err := FindFSType(ctx, mountpoint)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
+	// Expect an error since /mnt/test doesn't exist and findmnt will fail
+	if err == nil {
+		t.Errorf("expected error for non-existent mountpoint, got nil")
 	}
-	t.Logf("Filesystem type: %s", result)
+	t.Logf("Filesystem type: %s, error: %v", result, err)
 }
 
 func TestDeviceRescan(t *testing.T) {

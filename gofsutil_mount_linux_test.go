@@ -85,6 +85,214 @@ func TestGetDiskFormatUnknownData(t *testing.T) {
 	}
 }
 
+func TestGetDiskFormatSDCWithFilesystem(t *testing.T) {
+	// Create a test FS
+	fs := &FS{}
+
+	// Create an SDC disk path
+	disk := "/dev/scinia"
+
+	// Mock the output
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+	defer func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}()
+
+	getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+		// Verify blkid is called with correct arguments
+		if name != "blkid" {
+			t.Errorf("expected blkid command, got %s", name)
+		}
+		expectedArgs := []string{"-o", "value", "-s", "TYPE", disk}
+		if len(args) != len(expectedArgs) {
+			t.Errorf("expected %d arguments, got %d", len(expectedArgs), len(args))
+		}
+		for i, arg := range expectedArgs {
+			if args[i] != arg {
+				t.Errorf("expected arg[%d] = %s, got %s", i, arg, args[i])
+			}
+		}
+		return []byte("xfs"), nil
+	}
+
+	// Call getDiskFormat
+	fstype, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if fstype != "xfs" {
+		t.Errorf("expected xfs, got %s", fstype)
+	}
+}
+
+func TestGetDiskFormatSDCUnformatted(t *testing.T) {
+	// Create a test FS
+	fs := &FS{}
+
+	// Create an SDC disk path
+	disk := "/dev/scinia"
+
+	// Mock the output
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+	defer func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}()
+
+	getExecCommandCombinedOutput = func(name string, _ ...string) ([]byte, error) {
+		// Verify blkid is called
+		if name != "blkid" {
+			t.Errorf("expected blkid command, got %s", name)
+		}
+		// Simulate blkid with empty output (unformatted device)
+		return []byte(""), nil
+	}
+
+	// Call getDiskFormat
+	fstype, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error for unformatted SDC device, got %v", err)
+	}
+	if fstype != "" {
+		t.Errorf("expected empty fstype for unformatted device, got %s", fstype)
+	}
+}
+
+func TestGetDiskFormatSDCNonSCDDevice(t *testing.T) {
+	// Create a test FS
+	fs := &FS{}
+
+	// Create a non-SDC disk path (should use lsblk)
+	disk := "/dev/sda1"
+
+	// Mock the output
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+	defer func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}()
+
+	getExecCommandCombinedOutput = func(name string, _ ...string) ([]byte, error) {
+		// Verify lsblk is called for non-SDC devices
+		if name != "lsblk" {
+			t.Errorf("expected lsblk command for non-SDC device, got %s", name)
+		}
+		return []byte("ext4"), nil
+	}
+
+	// Call getDiskFormat
+	fstype, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if fstype != "ext4" {
+		t.Errorf("expected ext4, got %s", fstype)
+	}
+}
+
+func TestGetDiskFormatBlkidFallbackDetectsFS(t *testing.T) {
+	fs := &FS{}
+	disk := "/dev/disk/by-id/dm-uuid-mpath-test123"
+
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+	defer func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}()
+
+	var lsblkCalled, blkidCalled bool
+	getExecCommandCombinedOutput = func(name string, args ...string) ([]byte, error) {
+		if name == "lsblk" {
+			lsblkCalled = true
+			return []byte("\n"), nil
+		}
+		if name == "blkid" {
+			blkidCalled = true
+			expectedArgs := []string{"-o", "value", "-s", "TYPE", disk}
+			if len(args) != len(expectedArgs) {
+				t.Errorf("expected %d blkid arguments, got %d", len(expectedArgs), len(args))
+			}
+			for i, arg := range expectedArgs {
+				if i < len(args) && args[i] != arg {
+					t.Errorf("expected blkid arg[%d] = %s, got %s", i, arg, args[i])
+				}
+			}
+			return []byte("ext4"), nil
+		}
+		t.Errorf("unexpected command: %s", name)
+		return nil, errors.New("unexpected command")
+	}
+
+	fstype, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if fstype != "ext4" {
+		t.Errorf("expected ext4, got %s", fstype)
+	}
+	if !lsblkCalled {
+		t.Errorf("expected lsblk to be called first")
+	}
+	if !blkidCalled {
+		t.Errorf("expected blkid to be called as fallback")
+	}
+}
+
+func TestGetDiskFormatBlkidFallbackUnformatted(t *testing.T) {
+	fs := &FS{}
+	disk := "/dev/disk/by-id/dm-uuid-mpath-test456"
+
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+	defer func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}()
+
+	getExecCommandCombinedOutput = func(name string, _ ...string) ([]byte, error) {
+		if name == "lsblk" {
+			return []byte("\n"), nil
+		}
+		if name == "blkid" {
+			return []byte(""), nil
+		}
+		t.Errorf("unexpected command: %s", name)
+		return nil, errors.New("unexpected command")
+	}
+
+	fstype, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if fstype != "" {
+		t.Errorf("expected empty fstype, got %s", fstype)
+	}
+}
+
+func TestGetDiskFormatBlkidFallbackError(t *testing.T) {
+	fs := &FS{}
+	disk := "/dev/disk/by-id/dm-uuid-mpath-test789"
+
+	defaultGetExecCommandCombinedOutput := getExecCommandCombinedOutput
+	defer func() {
+		getExecCommandCombinedOutput = defaultGetExecCommandCombinedOutput
+	}()
+
+	getExecCommandCombinedOutput = func(name string, _ ...string) ([]byte, error) {
+		if name == "lsblk" {
+			return []byte("\n"), nil
+		}
+		if name == "blkid" {
+			return []byte(""), errors.New("exit status 2")
+		}
+		t.Errorf("unexpected command: %s", name)
+		return nil, errors.New("unexpected command")
+	}
+
+	fstype, err := fs.getDiskFormat(context.Background(), disk)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if fstype != "" {
+		t.Errorf("expected empty fstype, got %s", fstype)
+	}
+}
+
 func Test_formatAndMount(t *testing.T) {
 	fs := &MockFS{}
 	ctx := context.WithValue(context.Background(), ContextKey("RequestID"), "test-req-id")

@@ -45,6 +45,13 @@ var (
 	// GONVMEValidDevices mocks existing devices
 	GONVMEValidDevices map[string]bool
 
+	// GOFSMockFstrimResult is returned by Fstrim in mock mode when set.
+	GOFSMockFstrimResult *FstrimResult
+	// GOFSMockBlkdiscardResult is returned by Blkdiscard in mock mode when set.
+	GOFSMockBlkdiscardResult *BlkdiscardResult
+	// GOFSMockDiscardCapability is returned by CheckDiscardSupport in mock mode when set.
+	GOFSMockDiscardCapability *DiscardCapability
+
 	// GOFSMock allows you to induce errors in the various routine.
 	GOFSMock struct {
 		InduceBindMountError              bool
@@ -71,6 +78,9 @@ var (
 		InduceGetMpathNameFromDeviceError bool
 		InduceFilesystemInfoError         bool
 		InduceGetNVMeControllerError      bool
+		InduceFstrimError                 bool
+		InduceBlkdiscardError             bool
+		InduceCheckDiscardSupportError    bool
 	}
 )
 
@@ -568,4 +578,61 @@ func (fs *mockfs) getNVMeController(device string) (string, error) {
 		return controller, nil
 	}
 	return "", fmt.Errorf("controller not found for device %s", device)
+}
+
+// ====================================================================
+// Space reclamation mock implementations
+
+func (fs *mockfs) fstrim(_ context.Context, _ string) (*FstrimResult, error) {
+	if GOFSMock.InduceFstrimError {
+		return nil, errors.New("fstrim induced error")
+	}
+	if GOFSMockFstrimResult != nil {
+		return GOFSMockFstrimResult, nil
+	}
+	return &FstrimResult{
+		BytesTrimmed: 1073741824, // 1 GiB
+		Duration:     500 * time.Millisecond,
+	}, nil
+}
+
+// Fstrim delegates to fs.fstrim following the gofsutil mock pattern.
+func (fs *mockfs) Fstrim(ctx context.Context, mountPoint string) (*FstrimResult, error) {
+	return fs.fstrim(ctx, mountPoint)
+}
+
+func (fs *mockfs) blkdiscard(_ context.Context, _ string) (*BlkdiscardResult, error) {
+	if GOFSMock.InduceBlkdiscardError {
+		return nil, errors.New("blkdiscard induced error")
+	}
+	if GOFSMockBlkdiscardResult != nil {
+		return GOFSMockBlkdiscardResult, nil
+	}
+	return &BlkdiscardResult{
+		BytesDiscarded: 107374182400, // 100 GiB
+		Duration:       2 * time.Second,
+	}, nil
+}
+
+// Blkdiscard delegates to fs.blkdiscard following the gofsutil mock pattern.
+func (fs *mockfs) Blkdiscard(ctx context.Context, devicePath string) (*BlkdiscardResult, error) {
+	return fs.blkdiscard(ctx, devicePath)
+}
+
+func (fs *mockfs) checkDiscardSupport(_ context.Context, _ string) (*DiscardCapability, error) {
+	if GOFSMock.InduceCheckDiscardSupportError {
+		return nil, errors.New("checkDiscardSupport induced error")
+	}
+	if GOFSMockDiscardCapability != nil {
+		return GOFSMockDiscardCapability, nil
+	}
+	return &DiscardCapability{
+		Supported:       true,
+		DiscardMaxBytes: 4294967295,
+	}, nil
+}
+
+// CheckDiscardSupport delegates to fs.checkDiscardSupport following the gofsutil mock pattern.
+func (fs *mockfs) CheckDiscardSupport(ctx context.Context, devicePath string) (*DiscardCapability, error) {
+	return fs.checkDiscardSupport(ctx, devicePath)
 }

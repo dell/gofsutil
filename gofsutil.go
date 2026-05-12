@@ -49,6 +49,11 @@ type FSinterface interface {
 	fsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
 	getNVMeController(device string) (string, error)
 
+	// Space reclamation — private (architecture-specific)
+	fstrim(ctx context.Context, mountPoint string) (*FstrimResult, error)
+	blkdiscard(ctx context.Context, devicePath string) (*BlkdiscardResult, error)
+	checkDiscardSupport(ctx context.Context, devicePath string) (*DiscardCapability, error)
+
 	// Architecture agnostic implementations, generally just wrappers
 	GetDiskFormat(ctx context.Context, disk string) (string, error)
 	Format(ctx context.Context, source, target, fsType string, options ...string) error
@@ -75,6 +80,11 @@ type FSinterface interface {
 	GetMpathNameFromDevice(ctx context.Context, device string) (string, error)
 	FsInfo(ctx context.Context, path string) (int64, int64, int64, int64, int64, int64, error)
 	GetNVMeController(device string) (string, error)
+
+	// Space reclamation — public (architecture-agnostic wrappers)
+	Fstrim(ctx context.Context, mountPoint string) (*FstrimResult, error)
+	Blkdiscard(ctx context.Context, devicePath string) (*BlkdiscardResult, error)
+	CheckDiscardSupport(ctx context.Context, devicePath string) (*DiscardCapability, error)
 }
 
 // MultipathDevDiskByIDPrefix is a pathname prefix for items located in /dev/disk/by-id
