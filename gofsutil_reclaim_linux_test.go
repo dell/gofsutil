@@ -534,6 +534,130 @@ func TestBlkdiscard_ContextTimeout(t *testing.T) {
 		"Error should contain 'blkdiscard timed out'")
 }
 
+// ---- Unit Tests: Exported package-level wrappers (U-030 to U-032) -----------
+
+// Test ID: U-030
+func TestPackageFstrim_ViaUseMockFS(t *testing.T) {
+	UseMockFS()
+	defer func() { fs = &FS{ScanEntry: defaultEntryScanFunc} }()
+
+	GOFSMock.InduceFstrimError = false
+	result, err := Fstrim(context.Background(), "/mnt/data")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, int64(1073741824), result.BytesTrimmed)
+
+	GOFSMock.InduceFstrimError = true
+	_, err = Fstrim(context.Background(), "/mnt/data")
+	require.Error(t, err)
+	GOFSMock.InduceFstrimError = false
+}
+
+// Test ID: U-031
+func TestPackageBlkdiscard_ViaUseMockFS(t *testing.T) {
+	UseMockFS()
+	defer func() { fs = &FS{ScanEntry: defaultEntryScanFunc} }()
+
+	GOFSMock.InduceBlkdiscardError = false
+	result, err := Blkdiscard(context.Background(), "/dev/sda")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	GOFSMock.InduceBlkdiscardError = true
+	_, err = Blkdiscard(context.Background(), "/dev/sda")
+	require.Error(t, err)
+	GOFSMock.InduceBlkdiscardError = false
+}
+
+// Test ID: U-032
+func TestPackageCheckDiscardSupport_ViaUseMockFS(t *testing.T) {
+	UseMockFS()
+	defer func() { fs = &FS{ScanEntry: defaultEntryScanFunc} }()
+
+	GOFSMock.InduceCheckDiscardSupportError = false
+	result, err := CheckDiscardSupport(context.Background(), "/dev/sda")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, result.Supported)
+
+	GOFSMock.InduceCheckDiscardSupportError = true
+	_, err = CheckDiscardSupport(context.Background(), "/dev/sda")
+	require.Error(t, err)
+	GOFSMock.InduceCheckDiscardSupportError = false
+}
+
+// ---- Unit Tests: FS exported method wrappers (U-033 to U-035) ---------------
+
+// Test ID: U-033
+func TestFS_Fstrim(t *testing.T) {
+	restore := setupReclaimMockExec(func(_ context.Context, name string, _ ...string) ([]byte, error) {
+		if name == "fstrim" {
+			return []byte("/mnt: 512 bytes were trimmed"), nil
+		}
+		return nil, nil
+	})
+	defer restore()
+
+	fsObj := &FS{}
+	result, err := fsObj.Fstrim(context.Background(), "/mnt")
+	require.NoError(t, err)
+	assert.Equal(t, int64(512), result.BytesTrimmed)
+}
+
+// Test ID: U-034
+func TestFS_Blkdiscard(t *testing.T) {
+	mockDir := setupMockSysfs(t, "sda", map[string]string{
+		"size": "2097152\n",
+	})
+	overrideSysBlockDir(t, mockDir)
+
+	restore := setupReclaimMockExec(func(_ context.Context, name string, _ ...string) ([]byte, error) {
+		if name == "blkdiscard" {
+			return []byte(""), nil
+		}
+		return nil, nil
+	})
+	defer restore()
+
+	fsObj := &FS{}
+	result, err := fsObj.Blkdiscard(context.Background(), "/dev/sda")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1073741824), result.BytesDiscarded)
+}
+
+// Test ID: U-035
+func TestFS_CheckDiscardSupport(t *testing.T) {
+	mockDir := setupMockSysfs(t, "sda", map[string]string{
+		"queue/discard_max_bytes": "4294967295\n",
+	})
+	overrideSysBlockDir(t, mockDir)
+
+	fsObj := &FS{}
+	result, err := fsObj.CheckDiscardSupport(context.Background(), "/dev/sda")
+	require.NoError(t, err)
+	assert.True(t, result.Supported)
+}
+
+// ---- Unit Tests: defaultReclaimExec (U-036) ---------------------------------
+
+// Test ID: U-036
+func TestDefaultReclaimExec_Success(t *testing.T) {
+	out, err := defaultReclaimExec(context.Background(), "echo", "hello")
+	require.NoError(t, err, "defaultReclaimExec should succeed with echo")
+	assert.Contains(t, string(out), "hello",
+		"Output should contain 'hello'")
+}
+
+// ---- Unit Tests: parseFstrimBytes overflow (U-037) --------------------------
+
+// Test ID: U-037
+func TestParseFstrimBytes_Overflow(t *testing.T) {
+	// A number larger than int64 max triggers ParseInt error → returns 0
+	result := parseFstrimBytes("99999999999999999999999 bytes trimmed")
+	assert.Equal(t, int64(0), result,
+		"parseFstrimBytes should return 0 for overflow value")
+}
+
 // ---- Test helpers for simulating exec errors --------------------------------
 
 // timeoutExecError is a test helper that simulates a process-killed error

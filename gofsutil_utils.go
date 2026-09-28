@@ -35,23 +35,27 @@ func validateFsType(fsType string) error {
 	return nil
 }
 
+var mountOptionRegex = regexp.MustCompile(`[\w]+[=]*[\w]*`)
+
 func validateMountOptions(mountOptions ...string) error {
 	for _, opt := range mountOptions {
 		// regex e.g: "rw", "noatime", "", " "
-		matched, err := regexp.Match(`[\w]+[=]*[\w]*`, []byte(opt))
-		if !matched || err != nil {
+		matched := mountOptionRegex.MatchString(opt)
+		if !matched {
 			return errors.New("Mount option: " + opt + " is invalid")
 		}
 	}
 	return nil
 }
 
+var multipathArgRegex = regexp.MustCompile(`[[-][AaBbCcdFfhilpqrTtUuWw0-9]+]*[0-9]*`)
+
 func validateMultipathArgs(options ...string) error {
 	for _, opt := range options {
 		// check for options
 		// regex e.g: "-A", "-iR", "-h1", "-/data0", "", " "
-		matched, err := regexp.Match(`[[-][AaBbCcdFfhilpqrTtUuWw0-9]+]*[0-9]*`, []byte(opt))
-		if matched && err == nil {
+		matched := multipathArgRegex.MatchString(opt)
+		if matched {
 			continue
 		}
 

@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/dell/csmlog"
 )
 
 const (
@@ -328,7 +328,7 @@ func execOSCommand(ctx context.Context, name string, args ...string) (rc int, er
 		}
 		out := truncOutput(errBuffer, name, args...)
 		if out.Len() > 0 {
-			log.Errorln(out.String())
+			log.Error(out.String())
 		}
 	}
 

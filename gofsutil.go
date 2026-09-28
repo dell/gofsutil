@@ -36,7 +36,7 @@ type FSinterface interface {
 	rescanSCSIHost(ctx context.Context, targets []string, lun string) error
 	removeBlockDevice(ctx context.Context, blockDevicePath string) error
 	targetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error)
-	multipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error)
+	multipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error)
 	getFCHostPortWWNs(ctx context.Context) ([]string, error)
 	issueLIPToAllFCHosts(ctx context.Context) error
 	getSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
@@ -68,7 +68,7 @@ type FSinterface interface {
 	RescanSCSIHost(ctx context.Context, targets []string, lun string) error
 	RemoveBlockDevice(ctx context.Context, blockDevicePath string) error
 	TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error)
-	MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error)
+	MultipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error)
 	GetFCHostPortWWNs(ctx context.Context) ([]string, error)
 	IssueLIPToAllFCHosts(ctx context.Context) error
 	GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
@@ -286,8 +286,8 @@ func RemoveBlockDevice(ctx context.Context, blockDevicePath string) error {
 // MultipathCommand executes the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
-func MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
-	return fs.MultipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+func MultipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	return fs.MultipathCommand(ctx, timeout, chroot, arguments...)
 }
 
 // TargetIPLUNToDevicePath returns the /dev/devxxx path when presented with an ISCSI target IP

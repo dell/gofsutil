@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-// Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright (c) Dell Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1460,7 +1460,7 @@ func TestFS_fsInfo(t *testing.T) {
 				t.Errorf("FS.fsInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !(tt.wantErr) {
+			if !tt.wantErr {
 
 				if got <= 0 {
 					t.Errorf("FS.fsInfo() got = %v, want = > 0", got)

@@ -1237,13 +1237,17 @@ func unpackGz(gzPath, targetPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open gz file: %w", err)
 	}
-	defer gzFile.Close()
+	defer func() {
+		_ = gzFile.Close()
+	}()
 
 	targetFile, err := os.Create(targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to create target file: %w", err)
 	}
-	defer targetFile.Close()
+	defer func() {
+		_ = targetFile.Close()
+	}()
 
 	// Use gunzip command to unpack
 	cmd := exec.Command("gunzip", "-c", gzPath)
@@ -1299,4 +1303,11 @@ func setupLoopback(imagePath string) (string, error) {
 func detachLoopback(loopDev string) error {
 	cmd := exec.Command("losetup", "-d", loopDev)
 	return cmd.Run()
+}
+
+func TestNoopFSCheckObserver_OnEvent(_ *testing.T) {
+	obs := &NoopFSCheckObserver{}
+	// Should not panic or error
+	obs.OnEvent("test event")
+	obs.OnEvent("")
 }

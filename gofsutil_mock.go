@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	log "github.com/dell/csmlog"
 )
 
 var (
@@ -111,11 +113,8 @@ func (fs *mockfs) formatAndMount(_ context.Context, source, target, fsType strin
 		GOFSMock.InduceMountError = false
 		return errors.New("bindMount induced error")
 	}
-	fmt.Printf(">>>formatAndMount source %s target %s fstype %s opts %v\n", source, target, fsType, opts)
-	info := Info{Device: getDevice(source), Path: target, Type: fsType, Opts: make([]string, 0)}
-	for _, str := range opts {
-		info.Opts = append(info.Opts, str)
-	}
+	log.Debugf(">>>formatAndMount source %s target %s fstype %s opts %v", source, target, fsType, opts)
+	info := Info{Device: getDevice(source), Path: target, Type: fsType, Opts: append([]string{}, opts...)}
 	GOFSMockMounts = append(GOFSMockMounts, info)
 	return nil
 }
@@ -124,7 +123,7 @@ func (fs *mockfs) format(_ context.Context, source, target, fsType string, opts 
 	if GOFSMock.InduceFormatError {
 		return errors.New("format induced error")
 	}
-	fmt.Printf(">>>format source %s target %s fstype %s opts %v\n", source, target, fsType, opts)
+	log.Debugf(">>>format source %s target %s fstype %s opts %v", source, target, fsType, opts)
 	for _, info := range GOFSMockMounts {
 		if info.Device == source {
 			info.Type = fsType
@@ -137,11 +136,8 @@ func (fs *mockfs) bindMount(_ context.Context, source, target string, opts ...st
 	if GOFSMock.InduceBindMountError {
 		return errors.New("bindMount induced error")
 	}
-	fmt.Printf(">>>bindMount source %s target %s opts %v\n", source, target, opts)
-	info := Info{Device: getDevice(source), Path: target, Opts: make([]string, 0)}
-	for _, str := range opts {
-		info.Opts = append(info.Opts, str)
-	}
+	log.Debugf(">>>bindMount source %s target %s opts %v", source, target, opts)
+	info := Info{Device: getDevice(source), Path: target, Opts: append([]string{}, opts...)}
 	GOFSMockMounts = append(GOFSMockMounts, info)
 	return nil
 }
@@ -248,11 +244,8 @@ func (fs *mockfs) mount(_ context.Context, source, target, fsType string, opts .
 	if GOFSMock.InduceMountError {
 		return errors.New("mount induced error")
 	}
-	fmt.Printf(">>>mount source %s target %s fstype %s opts %v\n", source, target, fsType, opts)
-	info := Info{Device: getDevice(source), Path: target, Opts: make([]string, 0)}
-	for _, str := range opts {
-		info.Opts = append(info.Opts, str)
-	}
+	log.Debugf(">>>mount source %s target %s fstype %s opts %v", source, target, fsType, opts)
+	info := Info{Device: getDevice(source), Path: target, Opts: append([]string{}, opts...)}
 
 	// Try to determine the root source.
 	for _, infox := range GOFSMockMounts {
@@ -261,7 +254,7 @@ func (fs *mockfs) mount(_ context.Context, source, target, fsType string, opts .
 			info.Device = "devtmpfs"
 		}
 	}
-	fmt.Printf(">>>mount Device %s Path %s Source %s\n", info.Device, info.Path, info.Source)
+	log.Debugf(">>>mount Device %s Path %s Source %s", info.Device, info.Path, info.Source)
 	GOFSMockMounts = append(GOFSMockMounts, info)
 	return nil
 }
@@ -418,8 +411,8 @@ func (fs *mockfs) RescanSCSIHost(ctx context.Context, targets []string, lun stri
 // Execute the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
-func (fs *mockfs) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
-	return fs.multipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+func (fs *mockfs) MultipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	return fs.multipathCommand(ctx, timeout, chroot, arguments...)
 }
 
 // rescanSCSIHost will rescan scsi hosts for a specified lun.
@@ -431,8 +424,7 @@ func (fs *mockfs) rescanSCSIHost(_ context.Context, _ []string, lun string) erro
 		return errors.New("induced rescan error")
 	}
 	if GOFSRescanCallback != nil {
-		scanString := fmt.Sprintf("%s", lun)
-		GOFSRescanCallback(scanString)
+		GOFSRescanCallback(lun)
 	}
 
 	return nil
@@ -452,7 +444,7 @@ func (fs *mockfs) RemoveBlockDevice(ctx context.Context, blockDevicePath string)
 // from the last component of the blockDevicePath and then removing the
 // device by writing '1' to /sys/block{deviceName}/device/delete
 func (fs *mockfs) removeBlockDevice(_ context.Context, blockDevicePath string) error {
-	fmt.Printf(">>>removeBlockDevice %s %#v", blockDevicePath, GOFSMockWWNToDevice)
+	log.Debugf(">>>removeBlockDevice %s %#v", blockDevicePath, GOFSMockWWNToDevice)
 	for key, value := range GOFSMockWWNToDevice {
 		if value == blockDevicePath {
 			// Remove from the device table
@@ -477,8 +469,8 @@ func getDevice(path string) string {
 		return path
 	}
 
-	result := strings.Replace(d, "\\", "/", -1)
-	fmt.Printf(">>>getDevice: %s -> %s\n", path, result)
+	result := strings.ReplaceAll(d, "\\", "/")
+	log.Debugf(">>>getDevice: %s -> %s", path, result)
 	return result
 }
 

@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -493,30 +494,33 @@ func TestWWNToDevicePathX(t *testing.T) {
 func TestMultipathCommand_Error(t *testing.T) {
 	// Test case: MultipathCommand with invalid chroot
 	ctx := context.Background()
-	timeoutSeconds := time.Duration(10)
+	timeout := time.Duration(10)
 	chroot := ""
 	arguments := []string{"-o", "defaults"}
 
-	if _, err := MultipathCommand(ctx, timeoutSeconds, chroot, arguments...); err == nil {
+	if _, err := MultipathCommand(ctx, timeout, chroot, arguments...); err == nil {
 		t.Errorf("MultipathCommand should have failed with empty chroot")
 	}
 }
 
 func TestTargetIPLUNToDevicePath_Error(t *testing.T) {
-	// Test case: TargetIPLUNToDevicePath with invalid targetIP
+	// Test case: TargetIPLUNToDevicePath with non-existent bypathdir
 	ctx := context.Background()
 	targetIP := "1.1.1.1"
 	lunID := 0
 
+	origBypathdir := bypathdir
+	bypathdir = "/nonexistent/path/that/does/not/exist"
+	defer func() { bypathdir = origBypathdir }()
+
 	if _, err := TargetIPLUNToDevicePath(ctx, targetIP, lunID); err == nil {
-		t.Errorf("TargetIPLUNToDevicePath error expectd")
+		t.Errorf("TargetIPLUNToDevicePath error expected")
 	}
 }
 
 func TestGetFCHostPortWWNs_Error(t *testing.T) {
 	// Test case: GetFCHostPortWWNs with with invalid context
-	ctx := context.Background()
-	ctx = nil
+	var ctx context.Context
 
 	tempDir := t.TempDir()
 	fcHostsDir = tempDir
@@ -602,4 +606,282 @@ func TestFsInfo_Error(t *testing.T) {
 	if _, _, _, _, _, _, err := FsInfo(ctx, path); err == nil {
 		t.Errorf("FsInfo should have failed with empty path")
 	}
+}
+
+func TestMockGetDevMounts(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Normal operation
+	GOFSMock.InduceDevMountsError = false
+	GOFSMockMounts = []Info{{Device: "/dev/sda", Path: "/mnt/data"}}
+	mounts, err := fs.GetDevMounts(ctx, "/dev/sda")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, mounts)
+
+	// Induced error
+	GOFSMock.InduceDevMountsError = true
+	_, err = fs.GetDevMounts(ctx, "/dev/sda")
+	assert.Error(t, err)
+	GOFSMock.InduceDevMountsError = false
+}
+
+func TestMockValidateDevice(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	_, err := fs.ValidateDevice(ctx, "/dev/sda")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
+}
+
+func TestMockReadProcMounts(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	_, _, err := fs.readProcMounts(ctx, "/", false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not implemented")
+}
+
+func TestMockRescanSCSIHost(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Normal operation
+	GOFSMock.InduceRescanError = false
+	err := fs.RescanSCSIHost(ctx, []string{}, "0")
+	assert.NoError(t, err)
+
+	// Induced error
+	GOFSMock.InduceRescanError = true
+	err = fs.RescanSCSIHost(ctx, []string{}, "0")
+	assert.Error(t, err)
+	GOFSMock.InduceRescanError = false
+}
+
+func TestMockRescanSCSIHost_WithCallback(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	var capturedScan string
+	GOFSRescanCallback = func(scanString string) {
+		capturedScan = scanString
+	}
+	defer func() { GOFSRescanCallback = nil }()
+
+	err := fs.RescanSCSIHost(ctx, []string{}, "5")
+	assert.NoError(t, err)
+	assert.Equal(t, "5", capturedScan)
+}
+
+func TestMockRemoveBlockDevice(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Induced error
+	GOFSMock.InduceRemoveBlockDeviceError = true
+	err := fs.RemoveBlockDevice(ctx, "/dev/sda")
+	assert.Error(t, err)
+	GOFSMock.InduceRemoveBlockDeviceError = false
+
+	// Normal operation with mock WWN entries
+	GOFSMockWWNToDevice = map[string]string{
+		"wwn1": "/dev/sda",
+		"wwn2": "/dev/sdb",
+	}
+	err = fs.RemoveBlockDevice(ctx, "/dev/sda")
+	assert.NoError(t, err)
+	// wwn1 should be removed
+	_, exists := GOFSMockWWNToDevice["wwn1"]
+	assert.False(t, exists)
+}
+
+func TestGetDevice(t *testing.T) {
+	// Test with nonexistent path - returns original string
+	result := getDevice("/nonexistent/path")
+	assert.Equal(t, "/nonexistent/path", result)
+
+	// Test with valid path - resolves symlinks
+	dir := t.TempDir()
+	result = getDevice(dir)
+	assert.NotEmpty(t, result)
+}
+
+func TestMockFstrim(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Normal operation
+	GOFSMock.InduceFstrimError = false
+	GOFSMockFstrimResult = nil
+	result, err := fs.Fstrim(ctx, "/mnt/data")
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, int64(1073741824), result.BytesTrimmed)
+
+	// With custom result
+	customResult := &FstrimResult{BytesTrimmed: 100}
+	GOFSMockFstrimResult = customResult
+	result, err = fs.Fstrim(ctx, "/mnt/data")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(100), result.BytesTrimmed)
+	GOFSMockFstrimResult = nil
+
+	// Induced error
+	GOFSMock.InduceFstrimError = true
+	_, err = fs.Fstrim(ctx, "/mnt/data")
+	assert.Error(t, err)
+	GOFSMock.InduceFstrimError = false
+}
+
+func TestMockBlkdiscard(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Normal operation
+	GOFSMock.InduceBlkdiscardError = false
+	GOFSMockBlkdiscardResult = nil
+	result, err := fs.Blkdiscard(ctx, "/dev/sda")
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+
+	// Induced error
+	GOFSMock.InduceBlkdiscardError = true
+	_, err = fs.Blkdiscard(ctx, "/dev/sda")
+	assert.Error(t, err)
+	GOFSMock.InduceBlkdiscardError = false
+}
+
+func TestMockCheckDiscardSupport(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Normal operation
+	GOFSMock.InduceCheckDiscardSupportError = false
+	GOFSMockDiscardCapability = nil
+	result, err := fs.CheckDiscardSupport(ctx, "/dev/sda")
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.True(t, result.Supported)
+
+	// Induced error
+	GOFSMock.InduceCheckDiscardSupportError = true
+	_, err = fs.CheckDiscardSupport(ctx, "/dev/sda")
+	assert.Error(t, err)
+	GOFSMock.InduceCheckDiscardSupportError = false
+}
+
+func TestMockMount_WithExistingSource(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	origMounts := GOFSMockMounts
+	defer func() { GOFSMockMounts = origMounts }()
+
+	// Pre-populate GOFSMockMounts with a source path
+	GOFSMockMounts = []Info{{Device: "/dev/sda1", Path: "/mnt/source"}}
+	GOFSMock.InduceMountError = false
+
+	// Mount with source = "/mnt/source" which matches Path of existing mount
+	err := fs.Mount(ctx, "/mnt/source", "/mnt/target", "ext4")
+	assert.NoError(t, err)
+
+	// Verify the new mount has the Source set from the existing mount
+	found := false
+	for _, m := range GOFSMockMounts {
+		if m.Path == "/mnt/target" {
+			found = true
+			assert.Equal(t, "/dev/sda1", m.Source)
+			assert.Equal(t, "devtmpfs", m.Device)
+		}
+	}
+	assert.True(t, found, "Expected mount to /mnt/target")
+}
+
+func TestMockWWNToDevicePath(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Setup mock WWN mapping
+	GOFSMockWWNToDevice = map[string]string{
+		"abc123": "/dev/sda",
+	}
+	GOFSWWNPath = "/dev/disk/by-id/wwn-0x"
+
+	// Normal operation
+	GOFSMock.InduceWWNToDevicePathError = false
+	byID, devPath, err := fs.WWNToDevicePath(ctx, "abc123")
+	assert.NoError(t, err)
+	assert.Equal(t, "/dev/disk/by-id/wwn-0xabc123", byID)
+	assert.Equal(t, "/dev/sda", devPath)
+
+	// With nil map (auto-initialized)
+	GOFSMockWWNToDevice = nil
+	byID, devPath, err = fs.WWNToDevicePath(ctx, "xyz")
+	assert.NoError(t, err)
+	assert.Equal(t, "/dev/disk/by-id/wwn-0xxyz", byID)
+	assert.Empty(t, devPath)
+
+	// Induced error
+	GOFSMock.InduceWWNToDevicePathError = true
+	_, _, err = fs.WWNToDevicePath(ctx, "abc123")
+	assert.Error(t, err)
+	GOFSMock.InduceWWNToDevicePathError = false
+}
+
+func TestMockTargetIPLUNToDevicePath(t *testing.T) {
+	ctx := context.Background()
+	fs := &mockfs{}
+
+	// Setup mock target mapping
+	GOFSMockTargetIPLUNToDevice = map[string]string{
+		"ip-1.1.1.1:-lun-0": "/dev/sda",
+	}
+
+	// Normal operation - matching entry
+	GOFSMock.InduceTargetIPLUNToDeviceError = false
+	result, err := fs.TargetIPLUNToDevicePath(ctx, "1.1.1.1", 0)
+	assert.NoError(t, err)
+	assert.Equal(t, "/dev/sda", result["ip-1.1.1.1:-lun-0"])
+
+	// Non-matching entry
+	result, err = fs.TargetIPLUNToDevicePath(ctx, "2.2.2.2", 1)
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+
+	// With nil map (auto-initialized)
+	GOFSMockTargetIPLUNToDevice = nil
+	result, err = fs.TargetIPLUNToDevicePath(ctx, "1.1.1.1", 0)
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+
+	// Induced error
+	GOFSMock.InduceTargetIPLUNToDeviceError = true
+	_, err = fs.TargetIPLUNToDevicePath(ctx, "1.1.1.1", 0)
+	assert.Error(t, err)
+	GOFSMock.InduceTargetIPLUNToDeviceError = false
+}
+
+func TestGetDevice_WithSymlink(t *testing.T) {
+	dir := t.TempDir()
+	realFile := filepath.Join(dir, "realfile")
+	require.NoError(t, os.WriteFile(realFile, []byte("test"), 0o644))
+
+	link := filepath.Join(dir, "symlink")
+	require.NoError(t, os.Symlink(realFile, link))
+
+	result := getDevice(link)
+	assert.Equal(t, realFile, result)
+}
+
+func TestGetDevice_EvalSymlinksError(t *testing.T) {
+	dir := t.TempDir()
+	// Create a dangling symlink (target doesn't exist)
+	link := filepath.Join(dir, "dangling")
+	require.NoError(t, os.Symlink(filepath.Join(dir, "nonexistent"), link))
+
+	// Lstat succeeds but EvalSymlinks fails on dangling symlink
+	result := getDevice(link)
+	assert.Equal(t, link, result)
 }
