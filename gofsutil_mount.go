@@ -253,7 +253,7 @@ func ReadProcMountsFrom(
 			continue
 		}
 
-		fmt.Fprint(hash, line)
+		_, _ = fmt.Fprint(hash, line)
 		infos = append(infos, i)
 	}
 

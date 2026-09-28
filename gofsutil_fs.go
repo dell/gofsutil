@@ -178,8 +178,8 @@ func (fs *FS) RemoveBlockDevice(ctx context.Context, blockDevicePath string) err
 // MultipathCommand executes the multipath command with a timeout and various arguments.
 // Optionally a chroot directory can be specified for changing root directory.
 // This only works in a container or another environment where it can chroot to /noderoot.
-func (fs *FS) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
-	return fs.multipathCommand(ctx, timeoutSeconds, chroot, arguments...)
+func (fs *FS) MultipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	return fs.multipathCommand(ctx, timeout, chroot, arguments...)
 }
 
 // fsInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)

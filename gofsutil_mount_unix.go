@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/dell/csmlog"
 )
 
 // mount mounts source to target as fsType with given options.
@@ -127,9 +127,13 @@ func (fs *FS) doMount(
 	if err != nil {
 		out := string(buf)
 		// check is explicitly placed for PowerScale driver only
-		if !(strings.Contains(args, "/ifs") && (strings.Contains(strings.ToLower(out), "access denied by server while mounting") || strings.Contains(strings.ToLower(out), "no such file or directory"))) {
-			log.WithFields(f).WithField("output", out).WithError(
-				err).Error("mount Failed")
+		if !strings.Contains(args, "/ifs") || (!strings.Contains(strings.ToLower(out), "access denied by server while mounting") && !strings.Contains(strings.ToLower(out), "no such file or directory")) {
+			log.WithFields(log.Fields{
+				"cmd":          mntCmd,
+				"args":         args,
+				"output":       out,
+				log.FieldError: err.Error(),
+			}).Error("mount Failed")
 		}
 		return fmt.Errorf(
 			"mount failed: %v\nmounting arguments: %s\noutput: %s",
@@ -152,7 +156,11 @@ func (fs *FS) unmount(_ context.Context, target string) error {
 
 	err := syscall.Unmount(path, 0)
 	if err != nil {
-		log.WithFields(f).WithError(err).Error("unmount failed")
+		log.WithFields(log.Fields{
+			"path":         target,
+			"cmd":          "umount",
+			log.FieldError: err.Error(),
+		}).Error("unmount failed")
 		return fmt.Errorf(
 			"unmount failed: %v\nunmounting arguments: %s",
 			err, target)
@@ -175,9 +183,7 @@ func (fs *FS) isBind(_ context.Context, opts ...string) ([]string, bool) {
 		switch o {
 		case "bind":
 			bind = true
-			break
 		case "remount":
-			break
 		default:
 			remountOpts = append(remountOpts, o)
 		}
@@ -247,7 +253,7 @@ func (fs *FS) wwnToDevicePath(
 
 			devPath, err = os.Readlink(symlinkPath)
 			if err != nil {
-				log.Printf("Check for disk path %s not found", symlinkPath)
+				log.Infof("Check for disk path %s not found", symlinkPath)
 				return "", "", err
 			}
 		}
@@ -255,7 +261,7 @@ func (fs *FS) wwnToDevicePath(
 	components := strings.Split(devPath, "/")
 	lastPart := components[len(components)-1]
 	devPath = "/dev/" + lastPart
-	log.Printf("Check for disk path %s found: %s", symlinkPath, devPath)
+	log.Infof("Check for disk path %s found: %s", symlinkPath, devPath)
 	return symlinkPath, devPath, err
 }
 
@@ -265,7 +271,7 @@ func (fs *FS) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID 
 
 	entries, err := os.ReadDir(bypathdir)
 	if err != nil {
-		log.Printf("%s not found: %s", bypathdir, err.Error())
+		log.Infof("%s not found: %s", bypathdir, err.Error())
 		return result, err
 	}
 	// Loop through the entries
@@ -277,21 +283,21 @@ func (fs *FS) targetIPLUNToDevicePath(_ context.Context, targetIP string, lunID 
 		if !strings.HasPrefix(name, "ip-"+targetIP+":") {
 			continue
 		}
-		if !(strings.HasSuffix(name, fmt.Sprintf("-lun-%d", lunID)) ||
-			strings.HasSuffix(name, fmt.Sprintf("-lun-0x%04x000000000000", lunID))) {
+		if !strings.HasSuffix(name, fmt.Sprintf("-lun-%d", lunID)) &&
+			!strings.HasSuffix(name, fmt.Sprintf("-lun-0x%04x000000000000", lunID)) {
 			continue
 		}
 		// Look up the symbolic link
 		path := bypathdir + "/" + name
 		devPath, err := os.Readlink(path)
 		if err != nil {
-			log.Printf("Check for disk path %s not found", path)
+			log.Infof("Check for disk path %s not found", path)
 			return result, err
 		}
 		components := strings.Split(devPath, "/")
 		lastPart := components[len(components)-1]
 		devPath = "/dev/" + lastPart
-		log.Printf("Check for disk path %s found: %s", path, devPath)
+		log.Infof("Check for disk path %s found: %s", path, devPath)
 		result[path] = devPath
 	}
 	return result, nil
@@ -333,7 +339,7 @@ func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) er
 	if err != nil {
 		return err
 	}
-	log.Printf("iscsiTargets: %s; fcTargets: %s", iscsiTargets, targetDevices)
+	log.Infof("iscsiTargets: %s; fcTargets: %s", iscsiTargets, targetDevices)
 
 	iscsiTargetDevices, err := getIscsiTargetHosts(iscsiTargets)
 	if err != nil {
@@ -346,14 +352,14 @@ func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) er
 		for _, entry := range targetDevices {
 			scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, entry.host)
 			scanstring := fmt.Sprintf("%s %s %s", entry.channel, entry.target, lun)
-			log.Printf("rescanning %s with: "+scanstring, scanfile)
+			log.Infof("rescanning %s with: "+scanstring, scanfile)
 			f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0o200)
 			if err != nil {
-				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
+				log.WithFields(log.Fields{"file": scanfile, log.FieldError: err.Error()}).Error("Failed to open scanfile")
 				continue
 			}
 			if _, err := f.WriteString(scanstring); err != nil {
-				log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
+				log.WithFields(log.Fields{"file": scanfile, log.FieldError: err.Error()}).Error("Failed to write rescan file")
 			}
 			errs := f.Close()
 			if errs != nil {
@@ -365,10 +371,10 @@ func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) er
 
 	// Fallback... we didn't find any target devices... so rescan all the hosts
 	// Gather up the host devices.
-	log.Printf("No targeted devices found... rescanning all the hosts")
+	log.Infof("No targeted devices found... rescanning all the hosts")
 	hosts, err := os.ReadDir(hostsdir)
 	if err != nil {
-		log.WithField("error", err).Error("Cannot read directory: " + hostsdir)
+		log.WithFields(log.Fields{log.FieldError: err.Error()}).Error("Cannot read directory: " + hostsdir)
 		return err
 	}
 	// For each of the matching hosts, perform a rescan.
@@ -378,14 +384,14 @@ func (fs *FS) rescanSCSIHost(_ context.Context, targets []string, lun string) er
 		}
 		scanfile := fmt.Sprintf("%s/%s/scan", hostsdir, host.Name())
 		scanstring := fmt.Sprintf("- - %s", lun)
-		log.Printf("rescanning %s with: "+scanstring, scanfile)
+		log.Infof("rescanning %s with: "+scanstring, scanfile)
 		f, err := os.OpenFile(filepath.Clean(scanfile), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
-			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to open scanfile")
+			log.WithFields(log.Fields{"file": scanfile, log.FieldError: err.Error()}).Error("Failed to open scanfile")
 			continue
 		}
 		if _, err := f.WriteString(scanstring); err != nil {
-			log.WithFields(log.Fields{"file": scanfile, "error": err}).Error("Failed to write rescan file")
+			log.WithFields(log.Fields{"file": scanfile, log.FieldError: err.Error()}).Error("Failed to write rescan file")
 		}
 		errs := f.Close()
 		if errs != nil {
@@ -411,7 +417,7 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 	// Read the directory entries for fc_remote_ports
 	remotePortEntries, err := os.ReadDir(fcRemotePortsDir)
 	if err != nil {
-		log.WithField("error", err).Error("Cannot read directory: " + fcRemotePortsDir)
+		log.WithFields(log.Fields{log.FieldError: err.Error()}).Error("Cannot read directory: " + fcRemotePortsDir)
 	}
 
 	// Look through
@@ -445,7 +451,7 @@ func getFCTargetHosts(targets []string) ([]*targetdev, error) {
 					entry.target = "-"
 					if !duplicates[entry.host] {
 						targetDev = append(targetDev, entry)
-						log.Debug(fmt.Sprintf("Adding target: %s", entry))
+						log.Debugf("Adding target: %s", entry)
 						duplicates[entry.host] = true
 					}
 				}
@@ -465,7 +471,7 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 	// Read the sessions.
 	sessions, err := os.ReadDir(sessionsdir)
 	if err != nil {
-		log.WithField("error", err).Error("Cannot read directory: " + sessionsdir)
+		log.WithFields(log.Fields{log.FieldError: err.Error()}).Error("Cannot read directory: " + sessionsdir)
 		return targetDev, err
 	}
 	// Look through the iscsi sessions
@@ -494,7 +500,7 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 		devicedir := sessionsdir + "/" + session.Name() + "/" + "device"
 		devices, err := os.ReadDir(devicedir)
 		if err != nil {
-			log.WithField("error", err).Error("Cannot read directory: " + devicedir)
+			log.WithFields(log.Fields{log.FieldError: err.Error()}).Error("Cannot read directory: " + devicedir)
 			continue
 		}
 		// Loop through the devices for the target* one
@@ -508,7 +514,7 @@ func getIscsiTargetHosts(targets []string) ([]*targetdev, error) {
 					entry.channel = split[1]
 					entry.target = split[2]
 					targetDev = append(targetDev, entry)
-					log.Debug(fmt.Sprintf("Adding target: %s", entry))
+					log.Debugf("Adding target: %s", entry)
 				}
 				break
 			}
@@ -545,21 +551,21 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 		statePath := filepath.Join(sysBlockDir, fmt.Sprintf("%s/device/state", deviceName))
 		stateBytes, err := os.ReadFile(filepath.Clean(statePath))
 		if err != nil {
-			return fmt.Errorf("Cannot read %s: %s", statePath, err)
+			return fmt.Errorf("cannot read %s: %s", statePath, err)
 		}
 		deviceState := strings.TrimSpace(string(stateBytes))
 		if deviceState == "blocked" {
-			return fmt.Errorf("Device %s is in blocked state", deviceName)
+			return fmt.Errorf("device %s is in blocked state", deviceName)
 		}
 		blockDeletePath := filepath.Join(sysBlockDir, fmt.Sprintf("%s/device/delete", deviceName))
 		f, err := os.OpenFile(filepath.Clean(blockDeletePath), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
-			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not open delete block device delete path")
+			log.WithFields(log.Fields{"BlockDeletePath": blockDeletePath}).Error("Could not open delete block device delete path")
 			return err
 		}
-		log.WithField("BlockDeletePath", blockDeletePath).Info("Writing '1' to block device delete path")
+		log.WithFields(log.Fields{"BlockDeletePath": blockDeletePath}).Info("Writing '1' to block device delete path")
 		if _, err := f.WriteString("1"); err != nil {
-			log.WithField("BlockDeletePath", blockDeletePath).Error("Could not write to block device delete path")
+			log.WithFields(log.Fields{"BlockDeletePath": blockDeletePath}).Error("Could not write to block device delete path")
 		}
 		err = f.Close()
 		if err != nil {
@@ -574,8 +580,8 @@ func (fs *FS) removeBlockDevice(_ context.Context, blockDevicePath string) error
 // This only works in a container or another environment where it can chroot to /noderoot.
 // When the -f <dev-name> option has been specified, the flush seems to happen but the
 // command seems to hang. The reason is currently unknown.
-func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeoutSeconds*time.Second)
+func (fs *FS) multipathCommand(_ context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
 	defer cancel()
 	var cmd *exec.Cmd
 	args := make([]string, 0)
@@ -586,14 +592,14 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 
 	if chroot == "" {
 		args = append(args, arguments...)
-		log.Printf("/usr/sbin/multipath %v", args)
+		log.Infof("/usr/sbin/multipath %v", args)
 		/* #nosec G204 */
 		cmd = exec.CommandContext(ctx, "/usr/sbin/multipath", args...)
 	} else {
 		args = append(args, chroot)
 		args = append(args, "/usr/sbin/multipath")
 		args = append(args, arguments...)
-		log.Printf("/usr/sbin/chroot %v", args)
+		log.Infof("/usr/sbin/chroot %v", args)
 		/* #nosec G204 */
 		cmd = exec.CommandContext(ctx, "/usr/sbin/chroot", args...)
 	}
@@ -602,7 +608,7 @@ func (fs *FS) multipathCommand(ctx context.Context, timeoutSeconds time.Duration
 		log.Error("multipath command failed: " + err.Error())
 	}
 	if len(textBytes) > 0 {
-		log.Debug(fmt.Printf("multipath output: %s", string(textBytes)))
+		log.Debugf("multipath output: %s", string(textBytes))
 	}
 	return textBytes, err
 }
@@ -613,7 +619,7 @@ func (fs *FS) getFCHostPortWWNs(_ context.Context) ([]string, error) {
 	// Read the directory entries for fc_remote_ports
 	hostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
-		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
+		log.WithFields(log.Fields{log.FieldError: err.Error()}).Error("Cannot read directory: " + fcHostsDir)
 		return portWWNs, err
 	}
 
@@ -639,7 +645,7 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 	// Read the directory entries for fc_remote_ports
 	fcHostEntries, err := os.ReadDir(fcHostsDir)
 	if err != nil {
-		log.WithField("error", err).Error("Cannot read directory: " + fcHostsDir)
+		log.WithFields(log.Fields{log.FieldError: err.Error()}).Error("Cannot read directory: " + fcHostsDir)
 	}
 
 	// Look through the fc_hosts
@@ -649,15 +655,15 @@ func (fs *FS) issueLIPToAllFCHosts(_ context.Context) error {
 		}
 
 		lipFile := fmt.Sprintf("%s/%s/issue_lip", fcHostsDir, hostEntry.Name())
-		lipString := fmt.Sprintf("%s", "1")
-		log.Printf("issuing lip command %s to %s", lipString, lipFile)
+		lipString := "1"
+		log.Infof("issuing lip command %s to %s", lipString, lipFile)
 		f, err := os.OpenFile(filepath.Clean(lipFile), os.O_APPEND|os.O_WRONLY, 0o200)
 		if err != nil {
 			log.Error("Could not open issue_lip file at: " + lipFile)
 			continue
 		}
 		if _, err := f.WriteString(lipString); err != nil {
-			log.Error(fmt.Sprintf("Error issuing lip at %s: %s", lipFile, err))
+			log.Errorf("Error issuing lip at %s: %s", lipFile, err)
 			savedError = err
 		}
 		errs := f.Close()
@@ -717,7 +723,7 @@ func (fs *FS) getSysBlockDevicesForVolumeWWN(_ context.Context, volumeWWN string
 
 	end := time.Now()
 	dur := end.Sub(start)
-	log.Printf("getSysBlockDevicesForVolumeWWN %d %f", len(sysBlocks), dur.Seconds())
+	log.Infof("getSysBlockDevicesForVolumeWWN %d %f", len(sysBlocks), dur.Seconds())
 	return result, nil
 }
 
